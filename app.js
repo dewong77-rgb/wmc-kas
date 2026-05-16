@@ -1,15 +1,15 @@
 // ============================================
 // WMC KAS - app.js
-// Konfigurasi Supabase — isi setelah buat akun
+// Konfigurasi sbClient — isi setelah buat akun
 // ============================================
 
-const SUPABASE_URL = 'https://urseszjkqxivvaarjqro.supabase.co/rest/v1/';
-const SUPABASE_KEY = 'sb_publishable_il7NmuQEiyuVHzzF3XU37A_bLM_We4Q';
+const sbClient_URL = 'https://urseszjkqxivvaarjqro.sbClient.co/rest/v1/';
+const sbClient_KEY = 'sb_publishable_il7NmuQEiyuVHzzF3XU37A_bLM_We4Q';
 
 // ============================================
 // INIT
 // ============================================
-let supabase = null;
+let sbClient = null;
 let currentUser = null;
 let currentProfile = null;
 let allTrx = [];
@@ -20,28 +20,28 @@ let selectedKatId = null;
 let currentJenis = 'masuk';
 let detailTrxId = null;
 
-function initSupabase() {
-  if (SUPABASE_URL === 'ISI_SUPABASE_URL_DISINI') {
+function initsbClient() {
+  if (sbClient_URL === 'ISI_sbClient_URL_DISINI') {
     document.getElementById('config-warning').style.display = 'block';
     return false;
   }
-  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  sbClient = window.sbClient.createClient(sbClient_URL, sbClient_KEY);
   return true;
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const ok = initSupabase();
+  const ok = initsbClient();
   if (!ok) return;
 
   // Check session
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await sbClient.auth.getSession();
   if (session) {
     await loadProfile(session.user);
     showApp();
   }
 
   // Auth state change
-  supabase.auth.onAuthStateChange(async (event, session) => {
+  sbClient.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN' && session) {
       await loadProfile(session.user);
       showApp();
@@ -91,7 +91,7 @@ async function doLogin() {
   btn.disabled = true;
   errEl.style.display = 'none';
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+  const { error } = await sbClient.auth.signInWithPassword({ email, password: pass });
 
   if (error) {
     showAuthError('Email atau password salah');
@@ -107,20 +107,20 @@ function showAuthError(msg) {
 }
 
 async function doLogout() {
-  await supabase.auth.signOut();
+  await sbClient.auth.signOut();
 }
 
 async function loadProfile(user) {
   currentUser = user;
-  const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+  const { data } = await sbClient.from('profiles').select('*').eq('id', user.id).single();
   currentProfile = data;
 
   if (!currentProfile) {
     // First time — create profile as admin (first user)
-    const { data: count } = await supabase.from('profiles').select('id', { count: 'exact', head: true });
+    const { data: count } = await sbClient.from('profiles').select('id', { count: 'exact', head: true });
     const role = (count === 0) ? 'admin' : 'viewer';
     const nama = user.email.split('@')[0];
-    await supabase.from('profiles').insert({ id: user.id, nama, email: user.email, role });
+    await sbClient.from('profiles').insert({ id: user.id, nama, email: user.email, role });
     currentProfile = { id: user.id, nama, email: user.email, role };
   }
 }
@@ -197,17 +197,17 @@ async function loadAll() {
 }
 
 async function loadKategori() {
-  const { data } = await supabase.from('kategori').select('*').eq('aktif', true).order('urutan');
+  const { data } = await sbClient.from('kategori').select('*').eq('aktif', true).order('urutan');
   allKategori = data || [];
 }
 
 async function loadKas() {
-  const { data } = await supabase.from('posisi_kas').select('*').eq('aktif', true).order('urutan');
+  const { data } = await sbClient.from('posisi_kas').select('*').eq('aktif', true).order('urutan');
   allKas = data || [];
 }
 
 async function loadTrx() {
-  const { data } = await supabase
+  const { data } = await sbClient
     .from('transaksi')
     .select(`*, kategori(nama, warna, jenis), posisi_kas(nama, tipe)`)
     .neq('status', 'batal')
@@ -407,7 +407,7 @@ function openDetail(id) {
 
 async function deleteTrx(id) {
   if (!confirm('Hapus transaksi ini?')) return;
-  const { error } = await supabase.from('transaksi').update({ status: 'batal' }).eq('id', id);
+  const { error } = await sbClient.from('transaksi').update({ status: 'batal' }).eq('id', id);
   if (!error) {
     closeSheet('detail');
     await loadTrx();
@@ -494,7 +494,7 @@ async function submitTrx() {
   btn.disabled = true;
   btn.textContent = 'Menyimpan...';
 
-  const { error } = await supabase.from('transaksi').insert({
+  const { error } = await sbClient.from('transaksi').insert({
     jenis: currentJenis,
     nominal,
     tanggal,
