@@ -3,7 +3,7 @@
 // Konfigurasi Supabase — isi setelah buat akun
 // ============================================
 
-const SUPABASE_URL = 'https://urseszjkqxivvaarjqro.supabase.co/rest/v1/';
+const SUPABASE_URL = 'https://urseszjkqxivvaarjqro.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_il7NmuQEiyuVHzzF3XU37A_bLM_We4Q';
 
 // ============================================
