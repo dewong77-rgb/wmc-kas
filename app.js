@@ -6,7 +6,7 @@
 const SUPABASE_URL = 'https://urseszjkqxivvaarjqro.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_il7NmuQEiyuVHzzF3XU37A_bLM_We4Q';
 
-/ ============================================
+// ============================================
 // INIT
 // ============================================
 let db = null;
