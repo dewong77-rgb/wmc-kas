@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0f1923">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="WMC Kas">
+  <title>WMC Kas</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg: #0f1923;
+      --bg2: #151f2e;
+      --bg3: #1a2535;
+      --surface: #1e2d3d;
+      --surface2: #243447;
+      --border: #2a3f55;
+      --text: #e8eef5;
+      --text2: #8fa3b8;
+      --text3: #5a7390;
+      --accent: #3b9eff;
+      --accent-dim: #1a4a7a;
+      --green: #22d172;
+      --green-dim: #0d3d24;
+      --red: #ff5f5f;
+      --red-dim: #3d1414;
+      --yellow: #fbbf24;
+      --yellow-dim: #3d2e0a;
+      --radius: 14px;
+      --radius-sm: 8px;
+      --font: 'Plus Jakarta Sans', sans-serif;
+      --mono: 'JetBrains Mono', monospace;
+      --nav-h: 68px;
+      --header-h: 60px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── AUTH SCREEN ── */
+    #auth-screen {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: radial-gradient(ellipse at 50% 0%, #1a2d4a 0%, var(--bg) 70%);
+    }
+
+    .auth-logo {
+      width: 72px; height: 72px;
+      background: linear-gradient(135deg, var(--accent), #6c5ce7);
+      border-radius: 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px; margin-bottom: 20px;
+      box-shadow: 0 8px 32px rgba(59,158,255,0.3);
+    }
+
+    .auth-title { font-size: 26px; font-weight: 800; margin-bottom: 6px; }
+    .auth-sub { font-size: 14px; color: var(--text2); margin-bottom: 36px; }
+
+    .auth-card {
+      width: 100%; max-width: 380px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+    }
+
+    .form-group { margin-bottom: 16px; }
+    .form-label { font-size: 13px; color: var(--text2); margin-bottom: 8px; display: block; font-weight: 500; }
+
+    .form-input {
+      width: 100%;
+      background: var(--bg2);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-input:focus { border-color: var(--accent); }
+    .form-input::placeholder { color: var(--text3); }
+
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border-radius: var(--radius-sm);
+      border: none;
+      font-family: var(--font);
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:active { opacity: 0.85; transform: scale(0.98); }
+    .btn-ghost { background: transparent; color: var(--text2); border: 1.5px solid var(--border); margin-top: 10px; }
+
+    .auth-error {
+      background: var(--red-dim);
+      border: 1px solid var(--red);
+      color: var(--red);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    /* ── APP SHELL ── */
+    #app { display: none; min-height: 100dvh; flex-direction: column; }
+
+    /* Header */
+    .app-header {
+      height: var(--header-h);
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center;
+      padding: 0 16px;
+      position: sticky; top: 0; z-index: 100;
+      gap: 12px;
+    }
+    .header-logo {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--accent), #6c5ce7);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+    .header-title { font-size: 16px; font-weight: 700; flex: 1; }
+    .header-user {
+      font-size: 12px; color: var(--text2);
+      background: var(--surface);
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+    }
+    .btn-icon {
+      width: 36px; height: 36px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; color: var(--text2);
+      flex-shrink: 0;
+    }
+
+    /* Main content */
+    .app-main {
+      flex: 1;
+      overflow-y: auto;
+      padding-bottom: calc(var(--nav-h) + 16px);
+    }
+
+    /* Bottom Nav */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      height: var(--nav-h);
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      display: flex; align-items: center;
+      padding: 0 8px;
+      padding-bottom: env(safe-area-inset-bottom);
+      z-index: 100;
+    }
+    .nav-item {
+      flex: 1;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 4px;
+      padding: 8px 0;
+      cursor: pointer;
+      border-radius: var(--radius-sm);
+      transition: all 0.2s;
+      color: var(--text3);
+    }
+    .nav-item.active { color: var(--accent); }
+    .nav-icon { font-size: 22px; line-height: 1; }
+    .nav-label { font-size: 10px; font-weight: 600; }
+
+    /* FAB */
+    .fab {
+      position: fixed;
+      bottom: calc(var(--nav-h) + 16px);
+      right: 20px;
+      width: 56px; height: 56px;
+      background: var(--accent);
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; color: white;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(59,158,255,0.4);
+      transition: all 0.2s;
+      z-index: 99;
+      border: none;
+    }
+    .fab:active { transform: scale(0.93); }
+
+    /* ── PAGES ── */
+    .page { display: none; padding: 16px; }
+    .page.active { display: block; }
+
+    /* Dashboard */
+    .saldo-card {
+      background: linear-gradient(135deg, #1a3a5c, #0f2540);
+      border: 1px solid #2a5080;
+      border-radius: var(--radius);
+      padding: 24px 20px;
+      margin-bottom: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    .saldo-card::before {
+      content: '';
+      position: absolute;
+      top: -40px; right: -40px;
+      width: 160px; height: 160px;
+      background: radial-gradient(circle, rgba(59,158,255,0.15) 0%, transparent 70%);
+    }
+    .saldo-label { font-size: 12px; color: #7aabda; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+    .saldo-amount {
+      font-family: var(--mono);
+      font-size: 32px; font-weight: 600;
+      color: white;
+      margin-bottom: 16px;
+      line-height: 1;
+    }
+    .saldo-amount.loading { color: var(--text3); }
+    .saldo-row { display: flex; gap: 12px; }
+    .saldo-pill {
+      flex: 1;
+      background: rgba(255,255,255,0.07);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .saldo-pill-label { font-size: 11px; color: #7aabda; margin-bottom: 4px; }
+    .saldo-pill-val { font-family: var(--mono); font-size: 14px; font-weight: 600; }
+    .saldo-pill-val.green { color: var(--green); }
+    .saldo-pill-val.red { color: var(--red); }
+
+    /* Stats row */
+    .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .stat-icon { font-size: 24px; margin-bottom: 8px; }
+    .stat-label { font-size: 11px; color: var(--text2); margin-bottom: 4px; font-weight: 500; }
+    .stat-val { font-family: var(--mono); font-size: 18px; font-weight: 700; }
+
+    /* Section header */
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .section-title { font-size: 14px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; }
+    .section-link { font-size: 13px; color: var(--accent); cursor: pointer; }
+
+    /* Transaksi item */
+    .trx-list { display: flex; flex-direction: column; gap: 8px; }
+    .trx-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      display: flex; align-items: center; gap: 12px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .trx-item:active { background: var(--surface2); }
+    .trx-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .trx-dot.masuk { background: var(--green); }
+    .trx-dot.keluar { background: var(--red); }
+    .trx-info { flex: 1; min-width: 0; }
+    .trx-ket {
+      font-size: 14px; font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .trx-meta { font-size: 12px; color: var(--text2); margin-top: 2px; }
+    .trx-nominal { font-family: var(--mono); font-size: 15px; font-weight: 700; flex-shrink: 0; }
+    .trx-nominal.masuk { color: var(--green); }
+    .trx-nominal.keluar { color: var(--red); }
+
+    /* Kas breakdown */
+    .kas-breakdown { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+    .kas-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .kas-icon { font-size: 20px; flex-shrink: 0; }
+    .kas-info { flex: 1; }
+    .kas-name { font-size: 14px; font-weight: 600; }
+    .kas-tipe { font-size: 11px; color: var(--text3); margin-top: 2px; }
+    .kas-saldo { font-family: var(--mono); font-size: 15px; font-weight: 700; }
+
+    /* Bar chart simple */
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .chart-title { font-size: 13px; font-weight: 700; color: var(--text2); margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .chart-bars { display: flex; align-items: flex-end; gap: 8px; height: 80px; }
+    .chart-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+    .chart-bar { width: 100%; border-radius: 4px 4px 0 0; min-height: 4px; transition: height 0.5s ease; }
+    .chart-bar.green { background: var(--green); }
+    .chart-bar.red { background: var(--red); }
+    .chart-bar-label { font-size: 9px; color: var(--text3); }
+    .chart-legend { display: flex; gap: 16px; margin-top: 12px; }
+    .chart-leg-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text2); }
+    .chart-leg-dot { width: 8px; height: 8px; border-radius: 2px; }
+
+    /* ── TRANSAKSI PAGE ── */
+    .filter-row { display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 4px; }
+    .filter-chip {
+      flex-shrink: 0;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer;
+      border: 1.5px solid var(--border);
+      background: transparent;
+      color: var(--text2);
+      font-family: var(--font);
+      transition: all 0.15s;
+    }
+    .filter-chip.active { background: var(--accent); border-color: var(--accent); color: white; }
+    .filter-chip.green.active { background: var(--green); border-color: var(--green); color: #0a2015; }
+    .filter-chip.red.active { background: var(--red); border-color: var(--red); color: white; }
+
+    .search-input {
+      width: 100%;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px 10px 38px;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      outline: none;
+      margin-bottom: 12px;
+      position: relative;
+    }
+    .search-wrap { position: relative; margin-bottom: 12px; }
+    .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text3); font-size: 16px; pointer-events: none; }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text3);
+    }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-text { font-size: 15px; font-weight: 600; margin-bottom: 6px; color: var(--text2); }
+    .empty-sub { font-size: 13px; }
+
+    /* ── MODAL / BOTTOM SHEET ── */
+    .overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 200;
+      display: none;
+      backdrop-filter: blur(2px);
+    }
+    .overlay.show { display: flex; align-items: flex-end; }
+
+    .sheet {
+      width: 100%;
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      border-radius: 20px 20px 0 0;
+      padding: 16px 20px;
+      padding-bottom: calc(20px + env(safe-area-inset-bottom));
+      max-height: 92dvh;
+      overflow-y: auto;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .sheet.show { transform: translateY(0); }
+
+    .sheet-handle {
+      width: 36px; height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 0 auto 20px;
+    }
+    .sheet-title { font-size: 18px; font-weight: 800; margin-bottom: 20px; }
+
+    /* Jenis toggle */
+    .jenis-toggle {
+      display: grid; grid-template-columns: 1fr 1fr;
+      background: var(--bg);
+      border-radius: var(--radius-sm);
+      padding: 4px;
+      margin-bottom: 20px;
+    }
+    .jenis-btn {
+      padding: 10px;
+      border-radius: 6px;
+      text-align: center;
+      font-size: 14px; font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: var(--text3);
+    }
+    .jenis-btn.active.masuk { background: var(--green-dim); color: var(--green); }
+    .jenis-btn.active.keluar { background: var(--red-dim); color: var(--red); }
+
+    /* Kategori grid */
+    .kat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 4px; }
+    .kat-chip {
+      padding: 10px 6px;
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      text-align: center;
+      font-size: 12px; font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      color: var(--text2);
+    }
+    .kat-chip.selected { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    select.form-input { appearance: none; }
+
+    .nominal-input {
+      font-family: var(--mono);
+      font-size: 22px; font-weight: 700;
+      text-align: right;
+    }
+    .nominal-prefix {
+      position: absolute; left: 14px; top: 50%;
+      transform: translateY(-50%);
+      font-size: 15px; color: var(--text2); font-weight: 600;
+    }
+    .nominal-wrap { position: relative; }
+
+    .btn-submit {
+      width: 100%;
+      padding: 16px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: var(--font);
+      font-size: 16px; font-weight: 800;
+      cursor: pointer;
+      margin-top: 20px;
+      transition: all 0.2s;
+    }
+    .btn-submit:active { opacity: 0.85; transform: scale(0.98); }
+    .btn-submit.green { background: var(--green); color: #0a2015; }
+    .btn-submit.red { background: var(--red); }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Trx detail sheet */
+    .detail-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-key { font-size: 13px; color: var(--text2); }
+    .detail-val { font-size: 14px; font-weight: 600; text-align: right; max-width: 60%; }
+    .badge {
+      font-size: 11px; font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+    .badge.green { background: var(--green-dim); color: var(--green); }
+    .badge.red { background: var(--red-dim); color: var(--red); }
+    .badge.yellow { background: var(--yellow-dim); color: var(--yellow); }
+
+    .btn-delete {
+      width: 100%;
+      padding: 14px;
+      background: var(--red-dim);
+      color: var(--red);
+      border: 1.5px solid var(--red);
+      border-radius: var(--radius-sm);
+      font-family: var(--font);
+      font-size: 14px; font-weight: 700;
+      cursor: pointer;
+      margin-top: 16px;
+      display: none;
+    }
+
+    /* Kategori page */
+    .kat-manage-list { display: flex; flex-direction: column; gap: 8px; }
+    .kat-manage-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .kat-color-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .kat-manage-name { flex: 1; font-size: 14px; font-weight: 600; }
+    .kat-manage-jenis { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+
+    /* Profile page */
+    .profile-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      display: flex; align-items: center; gap: 16px;
+      margin-bottom: 20px;
+    }
+    .profile-avatar {
+      width: 56px; height: 56px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--accent), #6c5ce7);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; font-weight: 800;
+      color: white; flex-shrink: 0;
+    }
+    .profile-name { font-size: 18px; font-weight: 800; }
+    .profile-role { font-size: 13px; color: var(--text2); margin-top: 2px; }
+
+    .menu-list { display: flex; flex-direction: column; gap: 2px; }
+    .menu-item {
+      background: var(--surface);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      display: flex; align-items: center; gap: 12px;
+      cursor: pointer;
+      font-size: 14px; font-weight: 600;
+      transition: background 0.15s;
+    }
+    .menu-item:active { background: var(--surface2); }
+    .menu-icon { font-size: 18px; width: 28px; text-align: center; }
+    .menu-label { flex: 1; }
+    .menu-arrow { color: var(--text3); }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: calc(var(--nav-h) + 80px);
+      left: 50%; transform: translateX(-50%) translateY(20px);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 10px 20px;
+      font-size: 14px; font-weight: 600;
+      opacity: 0;
+      transition: all 0.3s;
+      z-index: 999;
+      white-space: nowrap;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.green { border-color: var(--green); color: var(--green); }
+    .toast.red { border-color: var(--red); color: var(--red); }
+
+    /* Loading spinner */
+    .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Config warning */
+    #config-warning {
+      background: var(--yellow-dim);
+      border: 1px solid var(--yellow);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      font-size: 13px;
+      color: var(--yellow);
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen">
+  <div class="auth-logo">💼</div>
+  <div class="auth-title">WMC Kas</div>
+  <div class="auth-sub">PT Widya Mandala Cendekia</div>
+  <div class="auth-card">
+    <div id="config-warning">
+      ⚠️ Supabase belum dikonfigurasi. Edit file <code>app.js</code> dan isi SUPABASE_URL & SUPABASE_KEY.
+    </div>
+    <div id="auth-error" class="auth-error"></div>
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input type="email" id="login-email" class="form-input" placeholder="nama@email.com" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <input type="password" id="login-pass" class="form-input" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary" id="btn-login">
+      <span id="login-text">Masuk</span>
+    </button>
+  </div>
+</div>
+
+<!-- APP SHELL -->
+<div id="app">
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-logo">💼</div>
+    <div class="header-title">WMC Kas</div>
+    <div class="header-user" id="header-user">...</div>
+  </header>
+
+  <!-- Main -->
+  <main class="app-main">
+
+    <!-- DASHBOARD PAGE -->
+    <div class="page active" id="page-dashboard">
+      <div class="saldo-card">
+        <div class="saldo-label">Total Saldo WMC</div>
+        <div class="saldo-amount" id="saldo-total">Memuat...</div>
+        <div class="saldo-row">
+          <div class="saldo-pill">
+            <div class="saldo-pill-label">Masuk Bulan Ini</div>
+            <div class="saldo-pill-val green" id="masuk-bulan">—</div>
+          </div>
+          <div class="saldo-pill">
+            <div class="saldo-pill-label">Keluar Bulan Ini</div>
+            <div class="saldo-pill-val red" id="keluar-bulan">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-icon">📊</div>
+          <div class="stat-label">Net Bulan Ini</div>
+          <div class="stat-val" id="net-bulan">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🧾</div>
+          <div class="stat-label">Transaksi Bulan Ini</div>
+          <div class="stat-val" id="trx-count">—</div>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">6 Bulan Terakhir</div>
+        <div class="chart-bars" id="chart-bars">
+          <div style="color:var(--text3);font-size:12px;width:100%;text-align:center;padding-top:30px">Memuat...</div>
+        </div>
+        <div class="chart-legend">
+          <div class="chart-leg-item"><div class="chart-leg-dot" style="background:var(--green)"></div> Masuk</div>
+          <div class="chart-leg-item"><div class="chart-leg-dot" style="background:var(--red)"></div> Keluar</div>
+        </div>
+      </div>
+
+      <div class="section-header">
+        <div class="section-title">Posisi Kas</div>
+      </div>
+      <div class="kas-breakdown" id="kas-breakdown">
+        <div style="color:var(--text3);font-size:13px;padding:12px 0">Memuat...</div>
+      </div>
+
+      <div class="section-header">
+        <div class="section-title">Transaksi Terbaru</div>
+        <div class="section-link" onclick="goPage('transaksi')">Lihat semua →</div>
+      </div>
+      <div class="trx-list" id="trx-recent">
+        <div style="color:var(--text3);font-size:13px;padding:12px 0">Memuat...</div>
+      </div>
+    </div>
+
+    <!-- TRANSAKSI PAGE -->
+    <div class="page" id="page-transaksi">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="search" class="form-input search-input" id="trx-search" placeholder="Cari keterangan...">
+      </div>
+      <div class="filter-row">
+        <button class="filter-chip active" data-filter="all" onclick="setFilter(this,'all')">Semua</button>
+        <button class="filter-chip green" data-filter="masuk" onclick="setFilter(this,'masuk')">Masuk</button>
+        <button class="filter-chip red" data-filter="keluar" onclick="setFilter(this,'keluar')">Keluar</button>
+      </div>
+      <div class="trx-list" id="trx-all">
+        <div style="color:var(--text3);font-size:13px;padding:12px 0">Memuat...</div>
+      </div>
+    </div>
+
+    <!-- KATEGORI PAGE -->
+    <div class="page" id="page-kategori">
+      <div class="section-header" style="margin-bottom:16px">
+        <div class="section-title">Kategori Masuk</div>
+        <div class="section-link" id="btn-add-kat">+ Tambah</div>
+      </div>
+      <div class="kat-manage-list" id="kat-masuk-list"></div>
+      <div class="section-header" style="margin:20px 0 16px">
+        <div class="section-title">Kategori Keluar</div>
+      </div>
+      <div class="kat-manage-list" id="kat-keluar-list"></div>
+    </div>
+
+    <!-- PROFIL PAGE -->
+    <div class="page" id="page-profil">
+      <div class="profile-card">
+        <div class="profile-avatar" id="profile-avatar">?</div>
+        <div>
+          <div class="profile-name" id="profile-name">...</div>
+          <div class="profile-role" id="profile-role">...</div>
+        </div>
+      </div>
+      <div class="menu-list">
+        <div class="menu-item" id="menu-users" style="display:none" onclick="alert('Fitur manajemen user segera hadir')">
+          <span class="menu-icon">👥</span>
+          <span class="menu-label">Manajemen Pengguna</span>
+          <span class="menu-arrow">›</span>
+        </div>
+        <div class="menu-item" onclick="goPage('kategori')">
+          <span class="menu-icon">🏷️</span>
+          <span class="menu-label">Kelola Kategori</span>
+          <span class="menu-arrow">›</span>
+        </div>
+        <div class="menu-item" onclick="alert('Fitur ekspor segera hadir')">
+          <span class="menu-icon">📤</span>
+          <span class="menu-label">Ekspor ke Excel</span>
+          <span class="menu-arrow">›</span>
+        </div>
+        <div class="menu-item" onclick="doLogout()">
+          <span class="menu-icon">🚪</span>
+          <span class="menu-label">Keluar</span>
+          <span class="menu-arrow">›</span>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:32px;color:var(--text3);font-size:12px">
+        WMC Kas v1.0 · PT Widya Mandala Cendekia
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Bottom Nav -->
+  <nav class="bottom-nav">
+    <div class="nav-item active" onclick="goPage('dashboard')">
+      <div class="nav-icon">🏠</div>
+      <div class="nav-label">Dashboard</div>
+    </div>
+    <div class="nav-item" onclick="goPage('transaksi')">
+      <div class="nav-icon">📋</div>
+      <div class="nav-label">Transaksi</div>
+    </div>
+    <div class="nav-item" onclick="goPage('profil')">
+      <div class="nav-icon">👤</div>
+      <div class="nav-label">Profil</div>
+    </div>
+  </nav>
+
+  <!-- FAB -->
+  <button class="fab" id="fab" onclick="openSheet()">＋</button>
+</div>
+
+<!-- MODAL: INPUT TRANSAKSI -->
+<div class="overlay" id="overlay-trx">
+  <div class="sheet" id="sheet-trx">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Transaksi Baru</div>
+
+    <div class="jenis-toggle">
+      <div class="jenis-btn active masuk" id="jenis-masuk" onclick="setJenis('masuk')">↑ Uang Masuk</div>
+      <div class="jenis-btn keluar" id="jenis-keluar" onclick="setJenis('keluar')">↓ Uang Keluar</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Nominal (Rp)</label>
+      <div class="nominal-wrap">
+        <span class="nominal-prefix">Rp</span>
+        <input type="number" id="trx-nominal" class="form-input nominal-input" placeholder="0" style="padding-left:44px" inputmode="numeric">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Kategori</label>
+      <div class="kat-grid" id="kat-grid"></div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Tanggal</label>
+        <input type="date" id="trx-tanggal" class="form-input">
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Posisi Kas</label>
+        <select id="trx-kas" class="form-input">
+          <option value="">Pilih...</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-top:16px">
+      <label class="form-label">Status</label>
+      <select id="trx-status" class="form-input">
+        <option value="lunas">Lunas</option>
+        <option value="pending">Pending</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Keterangan</label>
+      <input type="text" id="trx-ket" class="form-input" placeholder="Deskripsi singkat transaksi...">
+    </div>
+
+    <button class="btn-submit green" id="btn-submit-trx" onclick="submitTrx()">Simpan Transaksi</button>
+  </div>
+</div>
+
+<!-- MODAL: DETAIL TRANSAKSI -->
+<div class="overlay" id="overlay-detail">
+  <div class="sheet" id="sheet-detail">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="detail-title">Detail Transaksi</div>
+    <div id="detail-content"></div>
+    <button class="btn-delete" id="btn-delete-trx">🗑 Hapus Transaksi</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
