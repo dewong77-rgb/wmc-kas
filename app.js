@@ -1,25 +1,32 @@
-// WMC KAS - app.js v1.1
-// Isi dua baris di bawah dengan credentials Supabase kamu
-
+// WMC KAS - app.js v2.0
 var SUPABASE_URL = 'https://urseszjkqxivvaarjqro.supabase.co';
 var SUPABASE_KEY = 'sb_publishable_il7NmuQEiyuVHzzF3XU37A_bLM_We4Q';
-
+ 
 var db = null;
 var currentUser = null;
 var currentProfile = null;
 var allTrx = [];
 var allKategori = [];
 var allKas = [];
+var allAnggota = [];
+var allKegiatan = [];
+var allAnggaran = [];
 var activeFilter = 'all';
 var selectedKatId = null;
 var currentJenis = 'masuk';
 var currentKatJenis = 'masuk';
 var currentKasTipe = 'tunai';
+var currentKegiatanTipe = 'fullboard';
 var selectedColor = '#22d172';
-var detailTrxId = null;
-
+var editingTrxId = null;
+var currentPeriod = 'bulan';
+var pendingBuktiFile = null;
+var currentPage = 'dashboard';
+var selectedPeserta = {};
+ 
 var COLORS = ['#22d172','#3b9eff','#ff5f5f','#fbbf24','#a78bfa','#f472b6','#34d399','#60a5fa','#fb923c','#e879f9','#4ade80','#38bdf8'];
-
+var BULAN_NAMA = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+ 
 function initDB() {
   if (SUPABASE_URL === 'ISI_SUPABASE_URL_DISINI') {
     document.getElementById('config-warning').textContent = 'Supabase belum dikonfigurasi.';
@@ -29,74 +36,73 @@ function initDB() {
   db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   return true;
 }
-
+ 
 document.addEventListener('DOMContentLoaded', async function() {
   var ok = initDB();
   if (!ok) return;
-
   var s = await db.auth.getSession();
-  if (s.data.session) {
-    await loadProfile(s.data.session.user);
-    showApp();
-  }
-
+  if (s.data.session) { await loadProfile(s.data.session.user); showApp(); }
   db.auth.onAuthStateChange(async function(event, session) {
-    if (event === 'SIGNED_IN' && session) {
-      await loadProfile(session.user);
-      showApp();
-    } else if (event === 'SIGNED_OUT') {
-      showAuth();
+    if (event === 'SIGNED_IN' && session) { await loadProfile(session.user); showApp(); }
+    else if (event === 'SIGNED_OUT') { showAuth(); }
+  });
+  document.getElementById('btn-login').addEventListener('click', doLogin);
+  document.getElementById('login-pass').addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('trx-search').addEventListener('input', function(e) { renderTrxList(e.target.value); });
+ 
+  // Format nominal inputs
+  setupNominalInput('trx-nominal-display', 'trx-nominal-raw');
+  setupNominalInput('anggaran-nominal-display', 'anggaran-nominal-raw');
+ 
+  // Overlay close
+  ['trx','detail','anggaran','anggota','kegiatan','user','kat','kas'].forEach(function(t) {
+    var el = document.getElementById('overlay-' + t);
+    if (el) el.addEventListener('click', function(e) { if (e.target === e.currentTarget) closeSheet(t); });
+  });
+ 
+  document.getElementById('trx-tanggal').value = new Date().toISOString().split('T')[0];
+  var now = new Date();
+  // Isi tahun
+  ['ekspor-tahun','anggaran-tahun'].forEach(function(id) {
+    var sel = document.getElementById(id);
+    if (!sel) return;
+    for (var y = now.getFullYear(); y >= 2024; y--) {
+      var opt = document.createElement('option'); opt.value = y; opt.textContent = y; sel.appendChild(opt);
     }
   });
-
-  document.getElementById('btn-login').addEventListener('click', doLogin);
-  document.getElementById('login-pass').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') doLogin();
-  });
-  document.getElementById('trx-search').addEventListener('input', function(e) {
-    renderTrxList(e.target.value);
-  });
-
-  var overlays = ['trx','detail','user','kat','kas'];
-  overlays.forEach(function(t) {
-    var el = document.getElementById('overlay-' + t);
-    if (el) el.addEventListener('click', function(e) {
-      if (e.target === e.currentTarget) closeSheet(t);
-    });
-  });
-
-  document.getElementById('trx-tanggal').value = new Date().toISOString().split('T')[0];
+  document.getElementById('ekspor-bulan').value = now.getMonth();
+  document.getElementById('anggaran-bulan').value = now.getMonth() + 1;
   buildColorGrid();
 });
-
+ 
+function setupNominalInput(displayId, rawId) {
+  var el = document.getElementById(displayId);
+  if (!el) return;
+  el.addEventListener('input', function() {
+    var raw = this.value.replace(/\D/g, '');
+    document.getElementById(rawId).value = raw;
+    this.value = raw ? parseInt(raw).toLocaleString('id-ID') : '';
+  });
+  el.addEventListener('keydown', function(e) {
+    var allowed = [8,46,37,38,39,40,9];
+    if (allowed.indexOf(e.keyCode) >= 0) return;
+    if ((e.keyCode < 48 || e.keyCode > 57) && (e.keyCode < 96 || e.keyCode > 105)) e.preventDefault();
+  });
+}
+ 
 // AUTH
-
 async function doLogin() {
   var email = document.getElementById('login-email').value.trim();
   var pass = document.getElementById('login-pass').value;
   var btn = document.getElementById('btn-login');
   if (!email || !pass) { showAuthError('Email dan password wajib diisi'); return; }
-  btn.innerHTML = '<div class="spinner"></div>';
-  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div>'; btn.disabled = true;
   document.getElementById('auth-error').style.display = 'none';
   var r = await db.auth.signInWithPassword({ email: email, password: pass });
-  if (r.error) {
-    showAuthError('Email atau password salah');
-    btn.innerHTML = '<span>Masuk</span>';
-    btn.disabled = false;
-  }
+  if (r.error) { showAuthError('Email atau password salah'); btn.innerHTML = '<span>Masuk</span>'; btn.disabled = false; }
 }
-
-function showAuthError(msg) {
-  var el = document.getElementById('auth-error');
-  el.textContent = msg;
-  el.style.display = 'block';
-}
-
-async function doLogout() {
-  await db.auth.signOut();
-}
-
+function showAuthError(msg) { var el = document.getElementById('auth-error'); el.textContent = msg; el.style.display = 'block'; }
+async function doLogout() { await db.auth.signOut(); }
 async function loadProfile(user) {
   currentUser = user;
   var r = await db.from('profiles').select('*').eq('id', user.id).single();
@@ -107,9 +113,8 @@ async function loadProfile(user) {
     currentProfile = { id: user.id, nama: nama, email: user.email, role: 'admin' };
   }
 }
-
-// APP SHELL
-
+ 
+// APP
 function showApp() {
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
@@ -117,584 +122,694 @@ function showApp() {
   updateProfilePage();
   loadAll();
 }
-
-function showAuth() {
-  document.getElementById('auth-screen').style.display = 'flex';
-  document.getElementById('app').style.display = 'none';
-}
-
+function showAuth() { document.getElementById('auth-screen').style.display = 'flex'; document.getElementById('app').style.display = 'none'; }
 function updateProfilePage() {
   if (!currentProfile) return;
   document.getElementById('profile-avatar').textContent = currentProfile.nama.charAt(0).toUpperCase();
   document.getElementById('profile-name').textContent = currentProfile.nama;
-  var roles = { admin: 'Admin', bendahara: 'Bendahara', input_only: 'Input Only', viewer: 'Viewer' };
+  var roles = { admin:'Admin', bendahara:'Bendahara', input_only:'Input Only', viewer:'Viewer' };
   document.getElementById('profile-role').textContent = roles[currentProfile.role] || currentProfile.role;
-  var adminItems = document.querySelectorAll('.admin-only');
-  adminItems.forEach(function(el) {
-    el.style.display = currentProfile.role === 'admin' ? 'flex' : 'none';
-  });
+  document.querySelectorAll('.admin-only').forEach(function(el) { el.style.display = currentProfile.role==='admin'?'flex':'none'; });
+  var canEkspor = currentProfile.role==='admin'||currentProfile.role==='bendahara';
+  document.querySelectorAll('.ekspor-menu').forEach(function(el) { el.style.display = canEkspor?'flex':'none'; });
+  var canAddKegiatan = currentProfile.role==='admin'||currentProfile.role==='bendahara';
+  var btnKeg = document.getElementById('btn-add-kegiatan');
+  if (btnKeg) btnKeg.style.display = canAddKegiatan ? 'block' : 'none';
 }
-
+ 
 // NAVIGASI
-
 function goPage(name) {
   document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
   document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
   var page = document.getElementById('page-' + name);
   if (page) page.classList.add('active');
-  var navMap = { dashboard: 0, transaksi: 1, profil: 2 };
+  currentPage = name;
+  var navMap = { dashboard:0, transaksi:1, anggaran:2, anggota:3, profil:4 };
   if (navMap[name] !== undefined) document.querySelectorAll('.nav-item')[navMap[name]].classList.add('active');
-  var noFab = ['profil','kategori','pengguna','poskas'];
+  var noFab = ['profil','kategori','pengguna','poskas','ekspor','log'];
   document.getElementById('fab').style.display = noFab.indexOf(name) >= 0 ? 'none' : 'flex';
-  var titles = { dashboard: 'WMC Kas', transaksi: 'Transaksi', profil: 'Profil', pengguna: 'Pengguna', kategori: 'Kategori', poskas: 'Posisi Kas' };
+  var titles = { dashboard:'WMC Kas', transaksi:'Transaksi', anggaran:'Anggaran', anggota:'Anggota & Kegiatan', profil:'Profil', pengguna:'Pengguna', kategori:'Kategori', poskas:'Posisi Kas', ekspor:'Ekspor Laporan' };
   document.getElementById('header-title').textContent = titles[name] || 'WMC Kas';
   if (name === 'transaksi') renderTrxList();
   if (name === 'kategori') renderKategoriPage();
   if (name === 'pengguna') loadUsers();
   if (name === 'poskas') loadPosKasPage();
+  if (name === 'anggaran') renderAnggaranPage();
+  if (name === 'anggota') { renderRekapAnggota(); renderDataAnggota(); }
 }
-
-// LOAD DATA
-
+ 
+function onFabClick() {
+  if (currentPage === 'anggaran') { openSheetAnggaran(); return; }
+  if (currentPage === 'anggota') { openSheetAnggota(); return; }
+  openSheet('trx');
+}
+ 
+// DATA
 async function loadAll() {
-  await Promise.all([loadKategori(), loadKas(), loadTrx()]);
+  await Promise.all([loadKategori(), loadKas(), loadTrx(), loadAnggota(), loadKegiatan(), loadAnggaran()]);
   renderDashboard();
   renderTrxList();
   populateKasSelect();
 }
-
-async function loadKategori() {
-  var r = await db.from('kategori').select('*').eq('aktif', true).order('urutan');
-  allKategori = r.data || [];
-}
-
-async function loadKas() {
-  var r = await db.from('posisi_kas').select('*').eq('aktif', true).order('urutan');
-  allKas = r.data || [];
-}
-
+async function loadKategori() { var r = await db.from('kategori').select('*').eq('aktif',true).order('urutan'); allKategori = r.data||[]; }
+async function loadKas() { var r = await db.from('posisi_kas').select('*').eq('aktif',true).order('urutan'); allKas = r.data||[]; }
 async function loadTrx() {
-  var r = await db.from('transaksi')
-    .select('*, kategori(nama, warna, jenis), posisi_kas(nama, tipe)')
-    .neq('status', 'batal')
-    .order('tanggal', { ascending: false })
-    .limit(200);
-  allTrx = r.data || [];
+  var r = await db.from('transaksi').select('*,kategori(nama,warna,jenis),posisi_kas(nama,tipe)').neq('status','batal').order('tanggal',{ascending:false}).limit(500);
+  allTrx = r.data||[];
 }
-
+async function loadAnggota() { var r = await db.from('anggota').select('*').order('nama'); allAnggota = r.data||[]; }
+async function loadKegiatan() {
+  var r = await db.from('kegiatan').select('*,bendahara:bendahara_id(nama),kegiatan_peserta(id,anggota_id,jumlah_hari,nominal_iuran,sudah_bayar,anggota(nama))').order('tanggal_mulai',{ascending:false});
+  allKegiatan = r.data||[];
+}
+async function loadAnggaran() { var r = await db.from('anggaran').select('*,kategori(nama,warna)').order('tahun',{ascending:false}).order('bulan',{ascending:false}); allAnggaran = r.data||[]; }
+ 
+// LOG
+async function addLog(aksi, detail) {
+  if (!currentUser || !currentProfile) return;
+  await db.from('log_aktivitas').insert({ user_id:currentUser.id, user_nama:currentProfile.nama, aksi:aksi, detail:detail });
+}
+ 
 // DASHBOARD
-
 function renderDashboard() {
-  var totalSaldo = 0;
-  allTrx.forEach(function(t) { totalSaldo += t.jenis === 'masuk' ? t.nominal : -t.nominal; });
-  document.getElementById('saldo-total').textContent = formatRp(totalSaldo);
-  document.getElementById('saldo-total').style.color = totalSaldo >= 0 ? 'white' : 'var(--red)';
-
+  var totalMasuk = 0, totalKeluar = 0;
+  allTrx.forEach(function(t) { if (t.jenis==='masuk') totalMasuk+=t.nominal; else totalKeluar+=t.nominal; });
+  var saldo = totalMasuk - totalKeluar;
+  document.getElementById('saldo-total').textContent = formatRp(saldo);
+  document.getElementById('saldo-total').style.color = saldo>=0?'white':'var(--red)';
   var now = new Date();
-  var masukBulan = 0, keluarBulan = 0, countBulan = 0;
+  var masukBulan=0, keluarBulan=0, countBulan=0;
   allTrx.forEach(function(t) {
     var d = new Date(t.tanggal);
-    if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+    if (d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear()) {
       countBulan++;
-      if (t.jenis === 'masuk') masukBulan += t.nominal;
-      else keluarBulan += t.nominal;
+      if (t.jenis==='masuk') masukBulan+=t.nominal; else keluarBulan+=t.nominal;
     }
   });
   var net = masukBulan - keluarBulan;
   document.getElementById('masuk-bulan').textContent = formatRp(masukBulan);
   document.getElementById('keluar-bulan').textContent = formatRp(keluarBulan);
   document.getElementById('net-bulan').textContent = formatRp(net);
-  document.getElementById('net-bulan').style.color = net >= 0 ? 'var(--green)' : 'var(--red)';
-  document.getElementById('trx-count').textContent = countBulan + ' transaksi';
-
-  renderChart();
+  document.getElementById('net-bulan').style.color = net>=0?'var(--green)':'var(--red)';
+  document.getElementById('trx-count').textContent = allTrx.length+' transaksi';
+  renderPieChart(totalMasuk, totalKeluar);
+  renderTopKategori();
   renderKasBreakdown();
-
-  var recent = allTrx.slice(0, 5);
-  document.getElementById('trx-recent').innerHTML = recent.length
-    ? recent.map(trxHTML).join('')
-    : '<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">Belum ada transaksi</div></div>';
+  var recent = allTrx.slice(0,5);
+  document.getElementById('trx-recent').innerHTML = recent.length ? recent.map(trxHTML).join('') : '<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">Belum ada transaksi</div></div>';
 }
-
-function renderChart() {
+ 
+function renderPieChart(totalMasuk, totalKeluar) {
+  var total = totalMasuk+totalKeluar;
+  if (!total) { document.getElementById('pie-svg').innerHTML='<circle cx="55" cy="55" r="38" fill="none" stroke="#2a3f55" stroke-width="16"/>'; document.getElementById('pie-legend').innerHTML='<div style="color:var(--text3);font-size:13px">Belum ada data</div>'; return; }
+  var pM=totalMasuk/total, pK=totalKeluar/total, r=38, cx=55, cy=55, sw=16, circ=2*Math.PI*r;
+  document.getElementById('pie-svg').innerHTML =
+    '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="#22d172" stroke-width="'+sw+'" stroke-dasharray="'+(pM*circ)+' '+circ+'" stroke-dashoffset="'+(circ*0.25)+'" transform="rotate(-90 '+cx+' '+cy+')" />'
+    +'<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="#ff5f5f" stroke-width="'+sw+'" stroke-dasharray="'+(pK*circ)+' '+circ+'" stroke-dashoffset="'+(-(pM*circ)+circ*0.25)+'" transform="rotate(-90 '+cx+' '+cy+')" />'
+    +'<text x="'+cx+'" y="'+(cy-6)+'" text-anchor="middle" fill="#e8eef5" font-size="11" font-family="Plus Jakarta Sans" font-weight="700">'+Math.round(pM*100)+'%</text>'
+    +'<text x="'+cx+'" y="'+(cy+10)+'" text-anchor="middle" fill="#8fa3b8" font-size="9" font-family="Plus Jakarta Sans">Masuk</text>';
+  document.getElementById('pie-legend').innerHTML =
+    '<div class="pie-leg-item"><div class="pie-leg-dot" style="background:var(--green)"></div><div class="pie-leg-label">Pemasukan</div><div><span class="pie-leg-val" style="color:var(--green)">'+formatRp(totalMasuk)+'</span><span class="pie-leg-pct">'+Math.round(pM*100)+'%</span></div></div>'
+    +'<div class="pie-leg-item"><div class="pie-leg-dot" style="background:var(--red)"></div><div class="pie-leg-label">Pengeluaran</div><div><span class="pie-leg-val" style="color:var(--red)">'+formatRp(totalKeluar)+'</span><span class="pie-leg-pct">'+Math.round(pK*100)+'%</span></div></div>'
+    +'<div class="pie-leg-item" style="border-top:1px solid var(--border);padding-top:10px"><div class="pie-leg-dot" style="background:var(--accent)"></div><div class="pie-leg-label">Saldo Bersih</div><div><span class="pie-leg-val" style="color:'+(totalMasuk>=totalKeluar?'var(--green)':'var(--red)')+'">'+formatRp(totalMasuk-totalKeluar)+'</span></div></div>';
+}
+ 
+function renderTopKategori() {
   var now = new Date();
-  var months = [];
-  for (var i = 5; i >= 0; i--) {
-    var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push({ year: d.getFullYear(), month: d.getMonth(), label: d.toLocaleDateString('id', { month: 'short' }) });
-  }
-  var maxVal = 1;
-  var chartData = months.map(function(m) {
-    var masuk = 0, keluar = 0;
-    allTrx.forEach(function(t) {
-      var d = new Date(t.tanggal);
-      if (d.getMonth() === m.month && d.getFullYear() === m.year) {
-        if (t.jenis === 'masuk') masuk += t.nominal; else keluar += t.nominal;
-      }
+  var bulanIni = allTrx.filter(function(t) { var d=new Date(t.tanggal); return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear(); });
+  function topKat(jenis, elId) {
+    var map = {};
+    bulanIni.filter(function(t){return t.jenis===jenis;}).forEach(function(t) {
+      var nama = t.kategori?t.kategori.nama:'Lain-lain';
+      var warna = t.kategori?t.kategori.warna:(jenis==='masuk'?'#22d172':'#ff5f5f');
+      if (!map[nama]) map[nama]={nama:nama,warna:warna,total:0};
+      map[nama].total+=t.nominal;
     });
-    if (masuk > maxVal) maxVal = masuk;
-    if (keluar > maxVal) maxVal = keluar;
-    return { label: m.label, masuk: masuk, keluar: keluar };
-  });
-  document.getElementById('chart-bars').innerHTML = chartData.map(function(d) {
-    return '<div class="chart-bar-wrap">'
-      + '<div style="display:flex;gap:2px;align-items:flex-end;height:80px;width:100%">'
-      + '<div class="chart-bar green" style="flex:1;height:' + Math.max(4,(d.masuk/maxVal)*76) + 'px"></div>'
-      + '<div class="chart-bar red" style="flex:1;height:' + Math.max(4,(d.keluar/maxVal)*76) + 'px"></div>'
-      + '</div><div class="chart-bar-label">' + d.label + '</div></div>';
-  }).join('');
+    var sorted = Object.values(map).sort(function(a,b){return b.total-a.total;}).slice(0,4);
+    if (!sorted.length) { document.getElementById(elId).innerHTML='<div style="color:var(--text3);font-size:13px;padding:8px 0">Belum ada transaksi bulan ini</div>'; return; }
+    var maxVal = sorted[0].total;
+    document.getElementById(elId).innerHTML = sorted.map(function(k,i) {
+      return '<div class="top-kat-item"><div class="top-kat-rank">'+(i+1)+'</div><div class="top-kat-info"><div class="top-kat-name">'+k.nama+'</div><div class="top-kat-bar-wrap"><div class="top-kat-bar" style="width:'+Math.round((k.total/maxVal)*100)+'%;background:'+k.warna+'"></div></div></div><div class="top-kat-val" style="color:'+k.warna+'">'+formatRp(k.total)+'</div></div>';
+    }).join('');
+  }
+  topKat('masuk','top-masuk'); topKat('keluar','top-keluar');
 }
-
+ 
 function renderKasBreakdown() {
-  if (!allKas.length) { document.getElementById('kas-breakdown').innerHTML = '<div style="color:var(--text3);font-size:13px">Tidak ada data kas</div>'; return; }
-  var icons = { tunai: '💵', bank: '🏦', ewallet: '📱' };
+  if (!allKas.length) { document.getElementById('kas-breakdown').innerHTML='<div style="color:var(--text3);font-size:13px">Tidak ada data kas</div>'; return; }
+  var icons = {tunai:'💵',bank:'🏦',ewallet:'📱'};
   document.getElementById('kas-breakdown').innerHTML = allKas.map(function(k) {
-    var saldo = 0;
-    allTrx.forEach(function(t) { if (t.posisi_kas_id === k.id) saldo += t.jenis === 'masuk' ? t.nominal : -t.nominal; });
-    return '<div class="kas-item">'
-      + '<div class="kas-icon">' + (icons[k.tipe] || '💰') + '</div>'
-      + '<div class="kas-info"><div class="kas-name">' + k.nama + '</div><div class="kas-tipe">' + k.tipe.toUpperCase() + '</div></div>'
-      + '<div class="kas-saldo" style="color:' + (saldo >= 0 ? 'var(--text)' : 'var(--red)') + '">' + formatRp(saldo) + '</div>'
-      + '</div>';
+    var saldo=0; allTrx.forEach(function(t){if(t.posisi_kas_id===k.id)saldo+=t.jenis==='masuk'?t.nominal:-t.nominal;});
+    return '<div class="kas-item"><div class="kas-icon">'+(icons[k.tipe]||'💰')+'</div><div class="kas-info"><div class="kas-name">'+k.nama+'</div><div class="kas-tipe">'+k.tipe.toUpperCase()+'</div></div><div class="kas-saldo" style="color:'+(saldo>=0?'var(--text)':'var(--red)')+'">'+formatRp(saldo)+'</div></div>';
   }).join('');
 }
-
+ 
 // TRANSAKSI
-
 function trxHTML(t) {
-  var katNama = t.kategori ? t.kategori.nama : '-';
-  var tgl = new Date(t.tanggal).toLocaleDateString('id', { day: 'numeric', month: 'short', year: 'numeric' });
-  return '<div class="trx-item" onclick="openDetail(\'' + t.id + '\')">'
-    + '<div class="trx-dot ' + t.jenis + '"></div>'
-    + '<div class="trx-info"><div class="trx-ket">' + (t.keterangan || katNama) + '</div>'
-    + '<div class="trx-meta">' + tgl + ' · ' + katNama + '</div></div>'
-    + '<div class="trx-nominal ' + t.jenis + '">' + (t.jenis === 'masuk' ? '+' : '-') + formatRp(t.nominal) + '</div>'
-    + '</div>';
+  var katNama=t.kategori?t.kategori.nama:'-';
+  var tgl=new Date(t.tanggal).toLocaleDateString('id',{day:'numeric',month:'short',year:'numeric'});
+  return '<div class="trx-item" onclick="openDetail(\''+t.id+'\')"><div class="trx-dot '+t.jenis+'"></div><div class="trx-info"><div class="trx-ket">'+(t.keterangan||katNama)+'</div><div class="trx-meta">'+tgl+' · '+katNama+(t.bukti_url?' · 📎':'')+'</div></div><div class="trx-nominal '+t.jenis+'">'+(t.jenis==='masuk'?'+':'-')+formatRp(t.nominal)+'</div></div>';
 }
-
 function renderTrxList(search) {
-  search = search || '';
-  var filtered = allTrx.filter(function(t) {
-    if (activeFilter !== 'all' && t.jenis !== activeFilter) return false;
-    if (search) {
-      var a = (t.keterangan || '').toLowerCase();
-      var b = t.kategori ? t.kategori.nama.toLowerCase() : '';
-      if (a.indexOf(search.toLowerCase()) < 0 && b.indexOf(search.toLowerCase()) < 0) return false;
-    }
+  search=search||'';
+  var filtered=allTrx.filter(function(t){
+    if(activeFilter!=='all'&&t.jenis!==activeFilter)return false;
+    if(search){var a=(t.keterangan||'').toLowerCase(),b=t.kategori?t.kategori.nama.toLowerCase():'';if(a.indexOf(search.toLowerCase())<0&&b.indexOf(search.toLowerCase())<0)return false;}
     return true;
   });
-  document.getElementById('trx-all').innerHTML = filtered.length
-    ? filtered.map(trxHTML).join('')
-    : '<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">Tidak ada transaksi</div></div>';
+  document.getElementById('trx-all').innerHTML=filtered.length?filtered.map(trxHTML).join(''):'<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">Tidak ada transaksi</div></div>';
 }
-
-function setFilter(el, val) {
-  document.querySelectorAll('.filter-chip').forEach(function(c) { c.classList.remove('active'); });
-  el.classList.add('active');
-  activeFilter = val;
-  renderTrxList(document.getElementById('trx-search').value);
-}
-
+function setFilter(el,val){document.querySelectorAll('.filter-chip').forEach(function(c){c.classList.remove('active')});el.classList.add('active');activeFilter=val;renderTrxList(document.getElementById('trx-search').value);}
+ 
 function openDetail(id) {
-  var t = null;
-  for (var i = 0; i < allTrx.length; i++) { if (allTrx[i].id === id) { t = allTrx[i]; break; } }
-  if (!t) return;
-  detailTrxId = id;
-  var tgl = new Date(t.tanggal).toLocaleDateString('id', { day: 'numeric', month: 'long', year: 'numeric' });
-  var sc = { lunas: 'green', pending: 'yellow', batal: 'red' };
-  document.getElementById('detail-title').textContent = t.jenis === 'masuk' ? 'Uang Masuk' : 'Uang Keluar';
-  document.getElementById('detail-content').innerHTML =
-    '<div class="detail-row"><div class="detail-key">Nominal</div><div class="detail-val" style="font-family:var(--mono);font-size:20px;color:' + (t.jenis === 'masuk' ? 'var(--green)' : 'var(--red)') + '">' + (t.jenis === 'masuk' ? '+' : '-') + formatRp(t.nominal) + '</div></div>'
-    + '<div class="detail-row"><div class="detail-key">Tanggal</div><div class="detail-val">' + tgl + '</div></div>'
-    + '<div class="detail-row"><div class="detail-key">Kategori</div><div class="detail-val">' + (t.kategori ? t.kategori.nama : '-') + '</div></div>'
-    + '<div class="detail-row"><div class="detail-key">Posisi Kas</div><div class="detail-val">' + (t.posisi_kas ? t.posisi_kas.nama : '-') + '</div></div>'
-    + '<div class="detail-row"><div class="detail-key">Status</div><div class="detail-val"><span class="badge ' + (sc[t.status] || 'green') + '">' + t.status + '</span></div></div>'
-    + '<div class="detail-row"><div class="detail-key">Keterangan</div><div class="detail-val">' + (t.keterangan || '-') + '</div></div>';
-  var delBtn = document.getElementById('btn-delete-trx');
-  delBtn.style.display = currentProfile && currentProfile.role === 'admin' ? 'block' : 'none';
-  delBtn.onclick = function() { deleteTrx(id); };
+  var t=null; for(var i=0;i<allTrx.length;i++){if(allTrx[i].id===id){t=allTrx[i];break;}}
+  if(!t)return;
+  var tgl=new Date(t.tanggal).toLocaleDateString('id',{day:'numeric',month:'long',year:'numeric'});
+  var sc={lunas:'green',pending:'yellow',batal:'red'};
+  document.getElementById('detail-title').textContent=t.jenis==='masuk'?'Uang Masuk':'Uang Keluar';
+  document.getElementById('detail-content').innerHTML=
+    '<div class="detail-row"><div class="detail-key">Nominal</div><div class="detail-val" style="font-family:var(--mono);font-size:20px;color:'+(t.jenis==='masuk'?'var(--green)':'var(--red)')+'">'+(t.jenis==='masuk'?'+':'-')+formatRp(t.nominal)+'</div></div>'
+    +'<div class="detail-row"><div class="detail-key">Tanggal</div><div class="detail-val">'+tgl+'</div></div>'
+    +'<div class="detail-row"><div class="detail-key">Kategori</div><div class="detail-val">'+(t.kategori?t.kategori.nama:'-')+'</div></div>'
+    +'<div class="detail-row"><div class="detail-key">Posisi Kas</div><div class="detail-val">'+(t.posisi_kas?t.posisi_kas.nama:'-')+'</div></div>'
+    +'<div class="detail-row"><div class="detail-key">Status</div><div class="detail-val"><span class="badge '+(sc[t.status]||'green')+'">'+t.status+'</span></div></div>'
+    +'<div class="detail-row"><div class="detail-key">Keterangan</div><div class="detail-val">'+(t.keterangan||'-')+'</div></div>';
+  var buktiWrap=document.getElementById('detail-bukti-wrap'),buktiImg=document.getElementById('detail-bukti-img'),delBuktiBtn=document.getElementById('btn-del-bukti');
+  if(t.bukti_url){buktiWrap.style.display='block';buktiImg.src=t.bukti_url;delBuktiBtn.style.display=currentProfile&&currentProfile.role==='admin'?'block':'none';delBuktiBtn.onclick=function(){deleteBukti(t.id,t.bukti_url);};}else{buktiWrap.style.display='none';}
+  var canEdit=currentProfile&&(currentProfile.role==='admin'||currentProfile.role==='bendahara');
+  var canDel=currentProfile&&currentProfile.role==='admin';
+  var eb=document.getElementById('btn-edit-trx'),db2=document.getElementById('btn-delete-trx');
+  eb.style.display=canEdit?'block':'none'; db2.style.display=canDel?'block':'none';
+  eb.onclick=function(){closeSheet('detail');openEditTrx(id);}; db2.onclick=function(){deleteTrx(id);};
   openSheet('detail');
 }
-
+ 
+async function deleteBukti(trxId, buktiUrl) {
+  if (!confirm('Hapus bukti transaksi ini?')) return;
+  var path=buktiUrl.split('/bukti-transaksi/')[1];
+  if(path) await db.storage.from('bukti-transaksi').remove([decodeURIComponent(path)]);
+  await db.from('transaksi').update({bukti_url:null}).eq('id',trxId);
+  await addLog('Hapus bukti transaksi','ID: '+trxId);
+  closeSheet('detail'); await loadTrx(); renderDashboard(); showToast('Bukti dihapus','green');
+}
+ 
+function openEditTrx(id) {
+  var t=null; for(var i=0;i<allTrx.length;i++){if(allTrx[i].id===id){t=allTrx[i];break;}}
+  if(!t)return;
+  editingTrxId=id;
+  document.getElementById('trx-sheet-title').textContent='Edit Transaksi';
+  document.getElementById('edit-trx-id').value=id;
+  setJenis(t.jenis);
+  document.getElementById('trx-nominal-display').value=parseInt(t.nominal).toLocaleString('id-ID');
+  document.getElementById('trx-nominal-raw').value=t.nominal;
+  document.getElementById('trx-tanggal').value=t.tanggal;
+  document.getElementById('trx-status').value=t.status;
+  document.getElementById('trx-ket').value=t.keterangan||'';
+  selectedKatId=t.kategori_id; renderKatGrid(); populateKasSelect();
+  document.getElementById('trx-kas').value=t.posisi_kas_id||'';
+  var curWrap=document.getElementById('current-bukti-wrap');
+  if(t.bukti_url){curWrap.style.display='block';document.getElementById('current-bukti-img').src=t.bukti_url;}else{curWrap.style.display='none';}
+  pendingBuktiFile=null; document.getElementById('bukti-preview').style.display='none'; document.getElementById('bukti-filename').style.display='none';
+  openSheet('trx');
+}
+ 
 async function deleteTrx(id) {
-  if (!confirm('Hapus transaksi ini?')) return;
-  var r = await db.from('transaksi').update({ status: 'batal' }).eq('id', id);
-  if (!r.error) {
-    closeSheet('detail');
-    await loadTrx();
-    renderDashboard();
-    renderTrxList();
-    showToast('Transaksi dihapus', 'green');
-  } else {
-    showToast('Gagal menghapus', 'red');
-  }
+  if(!confirm('Hapus transaksi ini?'))return;
+  var r=await db.from('transaksi').update({status:'batal'}).eq('id',id);
+  if(!r.error){await addLog('Hapus transaksi','ID: '+id);closeSheet('detail');await loadTrx();renderDashboard();renderTrxList();showToast('Transaksi dihapus','green');}
+  else showToast('Gagal menghapus','red');
 }
-
-// INPUT TRANSAKSI
-
+ 
+function previewBukti(input) {
+  if(!input.files||!input.files[0])return;
+  var file=input.files[0]; pendingBuktiFile=file;
+  var fn=document.getElementById('bukti-filename'),prev=document.getElementById('bukti-preview');
+  fn.textContent=file.name; fn.style.display='block';
+  if(file.type.startsWith('image/')){var reader=new FileReader();reader.onload=function(e){prev.src=e.target.result;prev.style.display='block';};reader.readAsDataURL(file);}else{prev.style.display='none';}
+}
+ 
+async function uploadBukti(trxId) {
+  if(!pendingBuktiFile)return null;
+  var ext=pendingBuktiFile.name.split('.').pop();
+  var path=trxId+'/'+Date.now()+'.'+ext;
+  var r=await db.storage.from('bukti-transaksi').upload(path,pendingBuktiFile,{upsert:true});
+  if(r.error){showToast('Gagal upload bukti','red');return null;}
+  return db.storage.from('bukti-transaksi').getPublicUrl(path).data.publicUrl;
+}
+ 
 function openSheet(type) {
-  type = type || 'trx';
-  if (type === 'trx') {
-    var allowed = ['admin', 'bendahara', 'input_only'];
-    if (!currentProfile || allowed.indexOf(currentProfile.role) < 0) { showToast('Tidak punya akses input', 'red'); return; }
+  type=type||'trx';
+  if(type==='trx'){
+    var allowed=['admin','bendahara','input_only'];
+    if(!currentProfile||allowed.indexOf(currentProfile.role)<0){showToast('Tidak punya akses input','red');return;}
+    if(!editingTrxId){
+      document.getElementById('trx-sheet-title').textContent='Transaksi Baru';
+      document.getElementById('edit-trx-id').value='';
+      document.getElementById('trx-nominal-display').value='';
+      document.getElementById('trx-nominal-raw').value='';
+      document.getElementById('trx-ket').value='';
+      document.getElementById('trx-status').value='lunas';
+      document.getElementById('trx-tanggal').value=new Date().toISOString().split('T')[0];
+      document.getElementById('bukti-preview').style.display='none';
+      document.getElementById('bukti-filename').style.display='none';
+      document.getElementById('current-bukti-wrap').style.display='none';
+      document.getElementById('bukti-file').value='';
+      pendingBuktiFile=null; selectedKatId=null; setJenis('masuk');
+    }
     renderKatGrid();
   }
-  var overlay = document.getElementById('overlay-' + type);
-  var sheet = document.getElementById('sheet-' + type);
-  if (!overlay || !sheet) return;
-  overlay.classList.add('show');
-  setTimeout(function() { sheet.classList.add('show'); }, 10);
+  var overlay=document.getElementById('overlay-'+type),sheet=document.getElementById('sheet-'+type);
+  if(!overlay||!sheet)return;
+  overlay.classList.add('show'); setTimeout(function(){sheet.classList.add('show');},10);
 }
-
+ 
 function closeSheet(type) {
-  type = type || 'trx';
-  var sheet = document.getElementById('sheet-' + type);
-  var overlay = document.getElementById('overlay-' + type);
-  if (!sheet || !overlay) return;
-  sheet.classList.remove('show');
-  setTimeout(function() { overlay.classList.remove('show'); }, 300);
+  type=type||'trx';
+  if(type==='trx')editingTrxId=null;
+  var sheet=document.getElementById('sheet-'+type),overlay=document.getElementById('overlay-'+type);
+  if(!sheet||!overlay)return;
+  sheet.classList.remove('show'); setTimeout(function(){overlay.classList.remove('show');},300);
 }
-
+ 
 function setJenis(jenis) {
-  currentJenis = jenis;
-  document.getElementById('jenis-masuk').className = 'jenis-btn' + (jenis === 'masuk' ? ' active masuk' : '');
-  document.getElementById('jenis-keluar').className = 'jenis-btn' + (jenis === 'keluar' ? ' active keluar' : '');
-  document.getElementById('btn-submit-trx').className = 'btn-submit ' + (jenis === 'masuk' ? 'green' : 'red');
-  selectedKatId = null;
+  currentJenis=jenis;
+  document.getElementById('jenis-masuk').className='jenis-btn'+(jenis==='masuk'?' active masuk':'');
+  document.getElementById('jenis-keluar').className='jenis-btn'+(jenis==='keluar'?' active keluar':'');
+  document.getElementById('btn-submit-trx').className='btn-submit '+(jenis==='masuk'?'green':'red');
+  if(!editingTrxId)selectedKatId=null;
   renderKatGrid();
 }
-
+ 
 function renderKatGrid() {
-  var filtered = allKategori.filter(function(k) { return k.jenis === currentJenis; });
-  document.getElementById('kat-grid').innerHTML = filtered.map(function(k) {
-    return '<div class="kat-chip ' + (selectedKatId === k.id ? 'selected' : '') + '" onclick="selectKat(\'' + k.id + '\')">' + k.nama + '</div>';
-  }).join('');
+  var filtered=allKategori.filter(function(k){return k.jenis===currentJenis;});
+  document.getElementById('kat-grid').innerHTML=filtered.length?filtered.map(function(k){
+    return '<div class="kat-chip'+(selectedKatId===k.id?' selected':'')+'" onclick="selectKat(\''+k.id+'\')">'+k.nama+'</div>';
+  }).join(''):'<div style="color:var(--text3);font-size:12px;padding:8px 0;grid-column:span 3">Belum ada kategori.</div>';
 }
-
-function selectKat(id) {
-  selectedKatId = id;
-  renderKatGrid();
+function selectKat(id){selectedKatId=id;renderKatGrid();}
+function populateKasSelect(){
+  document.getElementById('trx-kas').innerHTML='<option value="">Pilih posisi kas...</option>'+allKas.map(function(k){return '<option value="'+k.id+'">'+k.nama+'</option>';}).join('');
 }
-
-function populateKasSelect() {
-  document.getElementById('trx-kas').innerHTML = '<option value="">Pilih posisi kas...</option>'
-    + allKas.map(function(k) { return '<option value="' + k.id + '">' + k.nama + '</option>'; }).join('');
-}
-
+ 
 async function submitTrx() {
-  var nominal = parseFloat(document.getElementById('trx-nominal').value);
-  var tanggal = document.getElementById('trx-tanggal').value;
-  var kasId = document.getElementById('trx-kas').value;
-  var ket = document.getElementById('trx-ket').value.trim();
-  var status = document.getElementById('trx-status').value;
-  if (!nominal || nominal <= 0) { showToast('Nominal harus diisi', 'red'); return; }
-  if (!tanggal) { showToast('Tanggal harus diisi', 'red'); return; }
-  if (!kasId) { showToast('Pilih posisi kas', 'red'); return; }
-  if (!selectedKatId) { showToast('Pilih kategori', 'red'); return; }
-  var btn = document.getElementById('btn-submit-trx');
-  btn.disabled = true;
-  btn.textContent = 'Menyimpan...';
-  var r = await db.from('transaksi').insert({ jenis: currentJenis, nominal: nominal, tanggal: tanggal, posisi_kas_id: kasId, kategori_id: selectedKatId, keterangan: ket, status: status, input_oleh: currentUser.id });
-  btn.disabled = false;
-  btn.textContent = 'Simpan Transaksi';
-  if (!r.error) {
-    closeSheet('trx');
-    document.getElementById('trx-nominal').value = '';
-    document.getElementById('trx-ket').value = '';
-    selectedKatId = null;
-    await loadTrx();
-    renderDashboard();
-    renderTrxList();
-    showToast('Transaksi tersimpan', 'green');
-  } else {
-    showToast('Gagal: ' + r.error.message, 'red');
-  }
+  var editId=document.getElementById('edit-trx-id').value;
+  var nominal=parseFloat(document.getElementById('trx-nominal-raw').value);
+  var tanggal=document.getElementById('trx-tanggal').value;
+  var kasId=document.getElementById('trx-kas').value;
+  var ket=document.getElementById('trx-ket').value.trim();
+  var status=document.getElementById('trx-status').value;
+  if(!nominal||nominal<=0){showToast('Nominal harus diisi','red');return;}
+  if(!tanggal){showToast('Tanggal harus diisi','red');return;}
+  if(!kasId){showToast('Pilih posisi kas','red');return;}
+  if(!selectedKatId){showToast('Pilih kategori','red');return;}
+  var btn=document.getElementById('btn-submit-trx');
+  btn.disabled=true; btn.textContent='Menyimpan...';
+  var payload={jenis:currentJenis,nominal:nominal,tanggal:tanggal,posisi_kas_id:kasId,kategori_id:selectedKatId,keterangan:ket,status:status};
+  var r,trxId;
+  if(editId){r=await db.from('transaksi').update(payload).eq('id',editId).select().single();trxId=editId;}
+  else{payload.input_oleh=currentUser.id;r=await db.from('transaksi').insert(payload).select().single();trxId=r.data?r.data.id:null;}
+  if(r.error){showToast('Gagal: '+r.error.message,'red');btn.disabled=false;btn.textContent='Simpan Transaksi';return;}
+  if(pendingBuktiFile&&trxId){btn.textContent='Upload bukti...';var buktiUrl=await uploadBukti(trxId);if(buktiUrl)await db.from('transaksi').update({bukti_url:buktiUrl}).eq('id',trxId);}
+  await addLog(editId?'Edit transaksi':'Tambah transaksi',formatRp(nominal)+' - '+ket);
+  btn.disabled=false; btn.textContent='Simpan Transaksi'; pendingBuktiFile=null;
+  closeSheet('trx'); await loadTrx(); renderDashboard(); renderTrxList();
+  showToast(editId?'Transaksi diperbarui':'Transaksi tersimpan','green');
 }
-
-// MANAJEMEN PENGGUNA
-
-async function loadUsers() {
-  var r = await db.from('profiles').select('*').order('created_at');
-  var users = r.data || [];
-  var roles = { admin: 'Admin', bendahara: 'Bendahara', input_only: 'Input Only', viewer: 'Viewer' };
-  var roleColor = { admin: 'var(--accent)', bendahara: 'var(--green)', input_only: 'var(--yellow)', viewer: 'var(--text3)' };
-  document.getElementById('user-list').innerHTML = users.length ? users.map(function(u) {
-    return '<div class="admin-item">'
-      + '<div class="admin-item-icon">' + u.nama.charAt(0).toUpperCase() + '</div>'
-      + '<div class="admin-item-info"><div class="admin-item-name">' + u.nama + '</div>'
-      + '<div class="admin-item-email">' + u.email + '</div>'
-      + '<div style="font-size:11px;font-weight:700;color:' + (roleColor[u.role] || 'var(--text2)') + ';margin-top:3px">' + (roles[u.role] || u.role) + '</div></div>'
-      + '<div class="admin-item-actions">'
-      + '<button class="btn-sm btn-sm-edit" onclick="editUser(\'' + u.id + '\',\'' + u.nama + '\',\'' + u.email + '\',\'' + u.role + '\')">Edit</button>'
-      + (u.id !== currentUser.id ? '<button class="btn-sm btn-sm-del" onclick="deleteUser(\'' + u.id + '\')">Hapus</button>' : '')
-      + '</div></div>';
-  }).join('') : '<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-text">Belum ada pengguna</div></div>';
+ 
+// ANGGARAN
+function renderAnggaranPage() {
+  // Build year filter
+  var years = {};
+  allAnggaran.forEach(function(a){years[a.tahun]=true;});
+  var yearList = Object.keys(years).sort(function(a,b){return b-a;});
+  var filterRow = document.getElementById('anggaran-filter-row');
+  filterRow.innerHTML = '<button class="filter-chip active" onclick="setAnggaranFilter(this,\'semua\')">Semua</button>'
+    + yearList.map(function(y){return '<button class="filter-chip" onclick="setAnggaranFilter(this,\''+y+'\')">'+y+'</button>';}).join('');
+  renderAnggaranList('semua');
 }
-
-function openSheetUser() {
-  document.getElementById('user-sheet-title').textContent = 'Tambah Pengguna';
-  document.getElementById('edit-user-id').value = '';
-  document.getElementById('user-nama').value = '';
-  document.getElementById('user-email').value = '';
-  document.getElementById('user-pass').value = '';
-  document.getElementById('user-role').value = 'viewer';
-  document.getElementById('user-email').disabled = false;
-  document.getElementById('user-pass').placeholder = 'Min. 6 karakter';
-  openSheet('user');
+ 
+function setAnggaranFilter(el, val) {
+  document.querySelectorAll('#anggaran-filter-row .filter-chip').forEach(function(c){c.classList.remove('active');});
+  el.classList.add('active');
+  renderAnggaranList(val);
 }
-
-function editUser(id, nama, email, role) {
-  document.getElementById('user-sheet-title').textContent = 'Edit Pengguna';
-  document.getElementById('edit-user-id').value = id;
-  document.getElementById('user-nama').value = nama;
-  document.getElementById('user-email').value = email;
-  document.getElementById('user-email').disabled = true;
-  document.getElementById('user-pass').value = '';
-  document.getElementById('user-pass').placeholder = 'Kosongkan jika tidak ganti password';
-  document.getElementById('user-role').value = role;
-  openSheet('user');
-}
-
-async function submitUser() {
-  var editId = document.getElementById('edit-user-id').value;
-  var nama = document.getElementById('user-nama').value.trim();
-  var email = document.getElementById('user-email').value.trim();
-  var pass = document.getElementById('user-pass').value;
-  var role = document.getElementById('user-role').value;
-
-  if (!nama) { showToast('Nama wajib diisi', 'red'); return; }
-
-  var btn = document.getElementById('btn-submit-user');
-  btn.disabled = true;
-  btn.textContent = 'Menyimpan...';
-
-  if (editId) {
-    // Edit existing — update profile
-    var r = await db.from('profiles').update({ nama: nama, role: role }).eq('id', editId);
-    if (r.error) { showToast('Gagal: ' + r.error.message, 'red'); btn.disabled = false; btn.textContent = 'Simpan Pengguna'; return; }
-    // Update password if filled — needs admin API, use RPC workaround
-    if (pass && pass.length >= 6) {
-      showToast('Password hanya bisa diubah oleh pengguna sendiri lewat reset email', 'yellow');
-    }
-  } else {
-    // Create new user
-    if (!email) { showToast('Email wajib diisi', 'red'); btn.disabled = false; btn.textContent = 'Simpan Pengguna'; return; }
-    if (!pass || pass.length < 6) { showToast('Password min. 6 karakter', 'red'); btn.disabled = false; btn.textContent = 'Simpan Pengguna'; return; }
-
-    // Create via admin API workaround — use signUp then update role
-    var r2 = await db.auth.admin ? null : await db.rpc('create_user_profile', { p_email: email, p_nama: nama, p_role: role });
-    if (!r2 || r2.error) {
-      // Fallback: insert profile only (user must register themselves)
-      showToast('Gunakan Supabase Dashboard untuk buat akun baru, lalu set role di sini', 'yellow');
-      btn.disabled = false;
-      btn.textContent = 'Simpan Pengguna';
-      return;
-    }
-  }
-
-  btn.disabled = false;
-  btn.textContent = 'Simpan Pengguna';
-  closeSheet('user');
-  loadUsers();
-  showToast('Pengguna disimpan', 'green');
-}
-
-async function deleteUser(id) {
-  if (!confirm('Hapus pengguna ini?')) return;
-  var r = await db.from('profiles').delete().eq('id', id);
-  if (!r.error) { loadUsers(); showToast('Pengguna dihapus', 'green'); }
-  else showToast('Gagal menghapus', 'red');
-}
-
-// MANAJEMEN KATEGORI
-
-function renderKategoriPage() {
-  var masuk = allKategori.filter(function(k) { return k.jenis === 'masuk'; });
-  var keluar = allKategori.filter(function(k) { return k.jenis === 'keluar'; });
-
-  function katItem(k) {
-    return '<div class="kat-manage-item">'
-      + '<div class="kat-color-dot" style="background:' + k.warna + '"></div>'
-      + '<div class="kat-manage-name">' + k.nama + '</div>'
-      + (currentProfile && currentProfile.role === 'admin' ? '<button class="btn-sm btn-sm-edit" onclick="editKat(\'' + k.id + '\',\'' + k.nama + '\',\'' + k.jenis + '\',\'' + k.warna + '\')">Edit</button>' : '')
-      + (currentProfile && currentProfile.role === 'admin' ? '<button class="btn-sm btn-sm-del" onclick="deleteKat(\'' + k.id + '\')">Hapus</button>' : '')
-      + '</div>';
-  }
-
-  document.getElementById('kat-masuk-list').innerHTML = masuk.map(katItem).join('')
-    || '<div style="color:var(--text3);font-size:13px;padding:8px 0">Belum ada kategori masuk</div>';
-  document.getElementById('kat-keluar-list').innerHTML = keluar.map(katItem).join('')
-    || '<div style="color:var(--text3);font-size:13px;padding:8px 0">Belum ada kategori keluar</div>';
-}
-
-function openSheetKat(jenis) {
-  document.getElementById('kat-sheet-title').textContent = 'Tambah Kategori';
-  document.getElementById('edit-kat-id').value = '';
-  document.getElementById('kat-nama').value = '';
-  currentKatJenis = jenis || 'masuk';
-  selectedColor = '#22d172';
-  setKatJenis(currentKatJenis);
-  buildColorGrid();
-  openSheet('kat');
-}
-
-function editKat(id, nama, jenis, warna) {
-  document.getElementById('kat-sheet-title').textContent = 'Edit Kategori';
-  document.getElementById('edit-kat-id').value = id;
-  document.getElementById('kat-nama').value = nama;
-  currentKatJenis = jenis;
-  selectedColor = warna;
-  setKatJenis(jenis);
-  buildColorGrid();
-  openSheet('kat');
-}
-
-function setKatJenis(jenis) {
-  currentKatJenis = jenis;
-  document.getElementById('kat-jenis-masuk').className = 'jenis-btn' + (jenis === 'masuk' ? ' active masuk' : '');
-  document.getElementById('kat-jenis-keluar').className = 'jenis-btn' + (jenis === 'keluar' ? ' active keluar' : '');
-}
-
-function buildColorGrid() {
-  var el = document.getElementById('color-grid');
-  if (!el) return;
-  el.innerHTML = COLORS.map(function(c) {
-    return '<div class="color-dot ' + (selectedColor === c ? 'selected' : '') + '" style="background:' + c + '" onclick="selectColor(\'' + c + '\')"></div>';
+ 
+function renderAnggaranList(filter) {
+  var filtered = filter==='semua' ? allAnggaran : allAnggaran.filter(function(a){return String(a.tahun)===String(filter);});
+  if(!filtered.length){document.getElementById('anggaran-list').innerHTML='<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-text">Belum ada anggaran</div><div class="empty-sub">Tambah lewat tombol + di atas</div></div>';return;}
+  document.getElementById('anggaran-list').innerHTML = filtered.map(function(a) {
+    // Hitung realisasi dari transaksi
+    var realisasi = allTrx.filter(function(t) {
+      if(t.jenis!=='keluar')return false;
+      var d=new Date(t.tanggal);
+      var matchBulan = a.bulan ? (d.getMonth()+1)===a.bulan : true;
+      var matchTahun = d.getFullYear()===a.tahun;
+      var matchKat = a.kategori_id ? t.kategori_id===a.kategori_id : true;
+      return matchBulan && matchTahun && matchKat;
+    }).reduce(function(s,t){return s+t.nominal;},0);
+    var pct = Math.min(100, Math.round((realisasi/a.nominal_target)*100));
+    var isAlert = pct >= 80;
+    var barColor = pct >= 100 ? 'var(--red)' : pct >= 80 ? 'var(--yellow)' : 'var(--green)';
+    var periode = a.bulan ? BULAN_NAMA[a.bulan-1]+' '+a.tahun : 'Tahun '+a.tahun;
+    return '<div class="anggaran-item">'
+      +'<div class="anggaran-header"><div><div class="anggaran-nama">'+a.nama+(isAlert?'<span class="alert-badge">⚠️ '+pct+'%</span>':'')+'</div><div class="anggaran-periode">'+periode+(a.kategori?' · '+a.kategori.nama:'')+'</div></div><div class="anggaran-target">'+formatRp(a.nominal_target)+'</div></div>'
+      +'<div class="progress-wrap"><div class="progress-bar" style="width:'+pct+'%;background:'+barColor+'"></div></div>'
+      +'<div class="anggaran-footer"><div class="anggaran-realisasi" style="color:'+barColor+'">Terpakai: '+formatRp(realisasi)+'</div><div class="anggaran-sisa">Sisa: '+formatRp(Math.max(0,a.nominal_target-realisasi))+'</div></div>'
+      +(currentProfile&&currentProfile.role==='admin'?'<div style="display:flex;gap:8px;margin-top:12px"><button class="btn-sm btn-sm-del" onclick="deleteAnggaran(\''+a.id+'\')">Hapus</button></div>':'')
+      +'</div>';
   }).join('');
 }
-
-function selectColor(c) {
-  selectedColor = c;
-  buildColorGrid();
+ 
+function openSheetAnggaran(id) {
+  document.getElementById('anggaran-sheet-title').textContent = 'Tambah Anggaran';
+  document.getElementById('edit-anggaran-id').value = '';
+  document.getElementById('anggaran-nama').value = '';
+  document.getElementById('anggaran-nominal-display').value = '';
+  document.getElementById('anggaran-nominal-raw').value = '';
+  document.getElementById('anggaran-catatan').value = '';
+  // populate kat select
+  var sel = document.getElementById('anggaran-kat');
+  sel.innerHTML = '<option value="">Semua kategori (keluar)</option>' + allKategori.filter(function(k){return k.jenis==='keluar';}).map(function(k){return '<option value="'+k.id+'">'+k.nama+'</option>';}).join('');
+  var now = new Date();
+  document.getElementById('anggaran-bulan').value = now.getMonth()+1;
+  openSheet('anggaran');
 }
-
-async function submitKat() {
-  var editId = document.getElementById('edit-kat-id').value;
-  var nama = document.getElementById('kat-nama').value.trim();
-  if (!nama) { showToast('Nama kategori wajib diisi', 'red'); return; }
-
-  var btn = document.getElementById('btn-submit-kat');
-  btn.disabled = true;
-  btn.textContent = 'Menyimpan...';
-
-  var payload = { nama: nama, jenis: currentKatJenis, warna: selectedColor };
-  var r = editId
-    ? await db.from('kategori').update(payload).eq('id', editId)
-    : await db.from('kategori').insert(Object.assign(payload, { aktif: true, urutan: 99 }));
-
-  btn.disabled = false;
-  btn.textContent = 'Simpan Kategori';
-
-  if (!r.error) {
-    closeSheet('kat');
-    await loadKategori();
-    renderKategoriPage();
-    renderKatGrid();
-    showToast('Kategori disimpan', 'green');
-  } else {
-    showToast('Gagal: ' + r.error.message, 'red');
-  }
+ 
+async function submitAnggaran() {
+  var nama=document.getElementById('anggaran-nama').value.trim();
+  var nominal=parseFloat(document.getElementById('anggaran-nominal-raw').value);
+  var bulan=parseInt(document.getElementById('anggaran-bulan').value);
+  var tahun=parseInt(document.getElementById('anggaran-tahun').value);
+  var katId=document.getElementById('anggaran-kat').value||null;
+  var catatan=document.getElementById('anggaran-catatan').value.trim();
+  if(!nama){showToast('Nama anggaran wajib diisi','red');return;}
+  if(!nominal||nominal<=0){showToast('Target nominal wajib diisi','red');return;}
+  var btn=document.getElementById('btn-submit-anggaran');
+  btn.disabled=true; btn.textContent='Menyimpan...';
+  var r=await db.from('anggaran').insert({nama:nama,kategori_id:katId,nominal_target:nominal,bulan:bulan,tahun:tahun,catatan:catatan,created_by:currentUser.id});
+  btn.disabled=false; btn.textContent='Simpan Anggaran';
+  if(!r.error){await addLog('Tambah anggaran',nama+' - '+formatRp(nominal));closeSheet('anggaran');await loadAnggaran();renderAnggaranPage();showToast('Anggaran disimpan','green');}
+  else showToast('Gagal: '+r.error.message,'red');
 }
-
-async function deleteKat(id) {
-  if (!confirm('Hapus kategori ini?')) return;
-  var r = await db.from('kategori').update({ aktif: false }).eq('id', id);
-  if (!r.error) { await loadKategori(); renderKategoriPage(); showToast('Kategori dihapus', 'green'); }
-  else showToast('Gagal menghapus', 'red');
+ 
+async function deleteAnggaran(id) {
+  if(!confirm('Hapus anggaran ini?'))return;
+  var r=await db.from('anggaran').delete().eq('id',id);
+  if(!r.error){await loadAnggaran();renderAnggaranPage();showToast('Anggaran dihapus','green');}
+  else showToast('Gagal menghapus','red');
 }
-
-// MANAJEMEN POSISI KAS
-
-async function loadPosKasPage() {
-  await loadKas();
-  var icons = { tunai: '💵', bank: '🏦', ewallet: '📱' };
-  document.getElementById('poskas-list').innerHTML = allKas.length ? allKas.map(function(k) {
-    return '<div class="admin-item">'
-      + '<div class="admin-item-icon">' + (icons[k.tipe] || '💰') + '</div>'
-      + '<div class="admin-item-info"><div class="admin-item-name">' + k.nama + '</div>'
-      + '<div class="admin-item-email">' + k.tipe.toUpperCase() + (k.nomor_rekening ? ' · ' + k.nomor_rekening : '') + '</div></div>'
-      + '<div class="admin-item-actions">'
-      + '<button class="btn-sm btn-sm-edit" onclick="editKas(\'' + k.id + '\',\'' + k.nama + '\',\'' + k.tipe + '\',\'' + (k.nomor_rekening || '') + '\')">Edit</button>'
-      + '<button class="btn-sm btn-sm-del" onclick="deletePosKas(\'' + k.id + '\')">Hapus</button>'
-      + '</div></div>';
-  }).join('') : '<div class="empty-state"><div class="empty-icon">🏦</div><div class="empty-text">Belum ada posisi kas</div></div>';
+ 
+// ANGGOTA TABS
+function setAnggotaTab(el, tab) {
+  document.querySelectorAll('#page-anggota .filter-chip').forEach(function(c){c.classList.remove('active');});
+  el.classList.add('active');
+  ['rekap','kegiatan','data','log'].forEach(function(t){
+    document.getElementById('anggota-tab-'+t).style.display = t===tab?'block':'none';
+  });
+  if(tab==='kegiatan')renderKegiatanList();
+  if(tab==='data')renderDataAnggota();
+  if(tab==='log')loadLogList();
 }
-
-function openSheetKas() {
-  document.getElementById('kas-sheet-title').textContent = 'Tambah Posisi Kas';
-  document.getElementById('edit-kas-id').value = '';
-  document.getElementById('kas-nama').value = '';
-  document.getElementById('kas-norek').value = '';
-  currentKasTipe = 'tunai';
-  setKasTipe('tunai');
-  openSheet('kas');
+ 
+// REKAP ANGGOTA
+function renderRekapAnggota() {
+  // Hitung kontribusi per anggota dari kegiatan_peserta
+  var kontribusi = {};
+  allKegiatan.forEach(function(k) {
+    if(!k.kegiatan_peserta)return;
+    k.kegiatan_peserta.forEach(function(p) {
+      var nama = p.anggota ? p.anggota.nama : 'Unknown';
+      var aid = p.anggota_id;
+      if(!kontribusi[aid]) kontribusi[aid]={nama:nama,total:0,kegiatan:0,hadir:0};
+      kontribusi[aid].total += p.nominal_iuran||0;
+      kontribusi[aid].kegiatan++;
+      if(p.sudah_bayar)kontribusi[aid].hadir++;
+    });
+  });
+  var sorted = Object.values(kontribusi).sort(function(a,b){return b.total-a.total;});
+  if(!sorted.length){document.getElementById('rekap-list').innerHTML='<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-text">Belum ada data kegiatan</div><div class="empty-sub">Tambah kegiatan dengan peserta dulu</div></div>';return;}
+  document.getElementById('rekap-list').innerHTML = sorted.map(function(a,i) {
+    var rankClass = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
+    return '<div class="anggota-item"><div class="rank-badge '+rankClass+'">'+(i+1)+'</div>'
+      +'<div class="anggota-avatar">'+a.nama.charAt(0).toUpperCase()+'</div>'
+      +'<div class="anggota-info"><div class="anggota-nama">'+a.nama+'</div><div class="anggota-jabatan">'+a.kegiatan+' kegiatan · '+a.hadir+' terbayar</div></div>'
+      +'<div class="anggota-kontribusi">'+formatRp(a.total)+'</div></div>';
+  }).join('');
 }
-
-function editKas(id, nama, tipe, norek) {
-  document.getElementById('kas-sheet-title').textContent = 'Edit Posisi Kas';
-  document.getElementById('edit-kas-id').value = id;
-  document.getElementById('kas-nama').value = nama;
-  document.getElementById('kas-norek').value = norek;
-  currentKasTipe = tipe;
-  setKasTipe(tipe);
-  openSheet('kas');
+ 
+// DATA ANGGOTA
+function renderDataAnggota() {
+  var isAdmin = currentProfile && currentProfile.role==='admin';
+  document.getElementById('data-anggota-list').innerHTML = allAnggota.length ? allAnggota.map(function(a) {
+    return '<div class="anggota-item"><div class="anggota-avatar">'+a.nama.charAt(0).toUpperCase()+'</div>'
+      +'<div class="anggota-info"><div class="anggota-nama">'+a.nama+'</div><div class="anggota-jabatan">'+(a.jabatan||'-')+(a.kontak?' · '+a.kontak:'')+'</div></div>'
+      +(isAdmin?'<div style="display:flex;gap:6px"><button class="btn-sm btn-sm-edit" onclick="editAnggota(\''+a.id+'\',\''+a.nama+'\',\''+( a.jabatan||'')+'\',\''+( a.kontak||'')+'\',\''+( a.email||'')+'\',\''+( a.catatan||'')+'\')">Edit</button><button class="btn-sm btn-sm-del" onclick="deleteAnggota(\''+a.id+'\')">Hapus</button></div>':'')
+      +'</div>';
+  }).join('') : '<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-text">Belum ada anggota</div><div class="empty-sub">Tambah data anggota dulu</div></div>';
 }
-
-function setKasTipe(tipe) {
-  currentKasTipe = tipe;
-  ['tunai','bank','ewallet'].forEach(function(t) {
-    document.getElementById('kas-tipe-' + t).className = 'tipe-btn' + (tipe === t ? ' active' : '');
+ 
+function openSheetAnggota() {
+  document.getElementById('anggota-sheet-title').textContent='Tambah Anggota';
+  document.getElementById('edit-anggota-id').value='';
+  document.getElementById('anggota-nama').value='';
+  document.getElementById('anggota-jabatan').value='';
+  document.getElementById('anggota-kontak').value='';
+  document.getElementById('anggota-email').value='';
+  document.getElementById('anggota-catatan').value='';
+  openSheet('anggota');
+}
+ 
+function editAnggota(id,nama,jabatan,kontak,email,catatan) {
+  document.getElementById('anggota-sheet-title').textContent='Edit Anggota';
+  document.getElementById('edit-anggota-id').value=id;
+  document.getElementById('anggota-nama').value=nama;
+  document.getElementById('anggota-jabatan').value=jabatan;
+  document.getElementById('anggota-kontak').value=kontak;
+  document.getElementById('anggota-email').value=email;
+  document.getElementById('anggota-catatan').value=catatan;
+  openSheet('anggota');
+}
+ 
+async function submitAnggota() {
+  var editId=document.getElementById('edit-anggota-id').value;
+  var nama=document.getElementById('anggota-nama').value.trim();
+  if(!nama){showToast('Nama wajib diisi','red');return;}
+  var payload={nama:nama,jabatan:document.getElementById('anggota-jabatan').value.trim()||null,kontak:document.getElementById('anggota-kontak').value.trim()||null,email:document.getElementById('anggota-email').value.trim()||null,catatan:document.getElementById('anggota-catatan').value.trim()||null};
+  var btn=document.getElementById('btn-submit-anggota');
+  btn.disabled=true; btn.textContent='Menyimpan...';
+  var r=editId?await db.from('anggota').update(payload).eq('id',editId):await db.from('anggota').insert(payload);
+  btn.disabled=false; btn.textContent='Simpan Anggota';
+  if(!r.error){await addLog(editId?'Edit anggota':'Tambah anggota',nama);closeSheet('anggota');await loadAnggota();renderDataAnggota();renderRekapAnggota();showToast('Anggota disimpan','green');}
+  else showToast('Gagal: '+r.error.message,'red');
+}
+ 
+async function deleteAnggota(id) {
+  if(!confirm('Hapus anggota ini?'))return;
+  var r=await db.from('anggota').delete().eq('id',id);
+  if(!r.error){await loadAnggota();renderDataAnggota();showToast('Anggota dihapus','green');}
+  else showToast('Gagal menghapus','red');
+}
+ 
+// KEGIATAN
+function renderKegiatanList() {
+  var tipeClass = {fullboard:'tipe-fullboard',perjadin:'tipe-perjadin',rapat:'tipe-rapat',lainnya:'tipe-lainnya'};
+  document.getElementById('kegiatan-list').innerHTML = allKegiatan.length ? allKegiatan.map(function(k) {
+    var totalIuran = k.kegiatan_peserta ? k.kegiatan_peserta.reduce(function(s,p){return s+(p.nominal_iuran||0);},0) : 0;
+    var totalBayar = k.kegiatan_peserta ? k.kegiatan_peserta.filter(function(p){return p.sudah_bayar;}).reduce(function(s,p){return s+(p.nominal_iuran||0);},0) : 0;
+    var jmlPeserta = k.kegiatan_peserta ? k.kegiatan_peserta.length : 0;
+    var tgl = new Date(k.tanggal_mulai).toLocaleDateString('id',{day:'numeric',month:'short',year:'numeric'});
+    return '<div class="kegiatan-item">'
+      +'<div class="kegiatan-header"><div class="kegiatan-nama">'+k.nama+'</div><div class="kegiatan-tipe '+(tipeClass[k.tipe]||'')+'">'+k.tipe+'</div></div>'
+      +'<div class="kegiatan-meta">'+tgl+(k.lokasi?' · '+k.lokasi:'')+(k.bendahara?' · PIC: '+k.bendahara.nama:'')+'</div>'
+      +'<div class="kegiatan-footer"><span style="color:var(--text2)">'+jmlPeserta+' peserta · '+formatRp(totalIuran)+'</span><span style="color:'+(totalBayar>=totalIuran?'var(--green)':'var(--yellow)')+'">Terbayar: '+formatRp(totalBayar)+'</span></div>'
+      +'</div>';
+  }).join('') : '<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-text">Belum ada kegiatan</div></div>';
+}
+ 
+function openSheetKegiatan() {
+  document.getElementById('kegiatan-sheet-title').textContent='Tambah Kegiatan';
+  document.getElementById('edit-kegiatan-id').value='';
+  document.getElementById('kegiatan-nama').value='';
+  document.getElementById('kegiatan-mulai').value=new Date().toISOString().split('T')[0];
+  document.getElementById('kegiatan-selesai').value='';
+  document.getElementById('kegiatan-hari').value='1';
+  document.getElementById('kegiatan-iuran').value='60000';
+  document.getElementById('kegiatan-lokasi').value='';
+  document.getElementById('kegiatan-catatan').value='';
+  currentKegiatanTipe='fullboard'; setKegiatanTipe('fullboard');
+  // Populate bendahara
+  var bendSel = document.getElementById('kegiatan-bendahara');
+  bendSel.innerHTML='<option value="">Pilih bendahara...</option>';
+  // Load profiles with role bendahara or admin
+  db.from('profiles').select('*').in('role',['admin','bendahara']).then(function(r){
+    var profiles = r.data||[];
+    profiles.forEach(function(p){var opt=document.createElement('option');opt.value=p.id;opt.textContent=p.nama+' ('+p.role+')';bendSel.appendChild(opt);});
+  });
+  // Populate peserta checklist
+  selectedPeserta={};
+  var cl = document.getElementById('peserta-checklist');
+  if(!allAnggota.length){cl.innerHTML='<div style="color:var(--text3);font-size:13px">Belum ada anggota. Tambah dulu di tab Data Anggota.</div>';return;}
+  cl.innerHTML = allAnggota.map(function(a) {
+    return '<div class="peserta-item"><div class="peserta-check" id="pcheck-'+a.id+'" onclick="togglePeserta(\''+a.id+'\')"></div><div class="peserta-nama">'+a.nama+'</div><div class="peserta-nominal" id="pnominal-'+a.id+'">-</div></div>';
+  }).join('');
+  openSheet('kegiatan');
+}
+ 
+function togglePeserta(id) {
+  selectedPeserta[id] = !selectedPeserta[id];
+  var el = document.getElementById('pcheck-'+id);
+  el.className = 'peserta-check' + (selectedPeserta[id]?' checked':'');
+  el.textContent = selectedPeserta[id] ? '✓' : '';
+  updatePesertaNominal();
+}
+ 
+function updatePesertaNominal() {
+  var hari = parseInt(document.getElementById('kegiatan-hari').value)||1;
+  var iuran = parseFloat(document.getElementById('kegiatan-iuran').value)||60000;
+  var total = hari * iuran;
+  allAnggota.forEach(function(a) {
+    var el = document.getElementById('pnominal-'+a.id);
+    if(el) el.textContent = selectedPeserta[a.id] ? formatRp(total) : '-';
   });
 }
-
-async function submitKas() {
-  var editId = document.getElementById('edit-kas-id').value;
-  var nama = document.getElementById('kas-nama').value.trim();
-  var norek = document.getElementById('kas-norek').value.trim();
-  if (!nama) { showToast('Nama wajib diisi', 'red'); return; }
-
-  var btn = document.getElementById('btn-submit-kas');
-  btn.disabled = true;
-  btn.textContent = 'Menyimpan...';
-
-  var payload = { nama: nama, tipe: currentKasTipe, nomor_rekening: norek || null };
-  var r = editId
-    ? await db.from('posisi_kas').update(payload).eq('id', editId)
-    : await db.from('posisi_kas').insert(Object.assign(payload, { aktif: true, urutan: 99 }));
-
-  btn.disabled = false;
-  btn.textContent = 'Simpan Posisi Kas';
-
-  if (!r.error) {
-    closeSheet('kas');
-    await loadKas();
-    loadPosKasPage();
-    populateKasSelect();
-    renderKasBreakdown();
-    showToast('Posisi kas disimpan', 'green');
-  } else {
-    showToast('Gagal: ' + r.error.message, 'red');
+ 
+document.addEventListener('change', function(e) {
+  if(e.target.id==='kegiatan-hari'||e.target.id==='kegiatan-iuran') updatePesertaNominal();
+});
+ 
+function setKegiatanTipe(tipe) {
+  currentKegiatanTipe=tipe;
+  ['fullboard','perjadin','rapat','lainnya'].forEach(function(t){
+    document.getElementById('ktipe-'+t).className='tipe-btn'+(tipe===t?' active':'');
+  });
+}
+ 
+async function submitKegiatan() {
+  var nama=document.getElementById('kegiatan-nama').value.trim();
+  var mulai=document.getElementById('kegiatan-mulai').value;
+  var selesai=document.getElementById('kegiatan-selesai').value||null;
+  var hari=parseInt(document.getElementById('kegiatan-hari').value)||1;
+  var iuran=parseFloat(document.getElementById('kegiatan-iuran').value)||60000;
+  var lokasi=document.getElementById('kegiatan-lokasi').value.trim()||null;
+  var bendahara=document.getElementById('kegiatan-bendahara').value||null;
+  var catatan=document.getElementById('kegiatan-catatan').value.trim()||null;
+  if(!nama){showToast('Nama kegiatan wajib diisi','red');return;}
+  if(!mulai){showToast('Tanggal mulai wajib diisi','red');return;}
+  var btn=document.getElementById('btn-submit-kegiatan');
+  btn.disabled=true; btn.textContent='Menyimpan...';
+  var r=await db.from('kegiatan').insert({nama:nama,tipe:currentKegiatanTipe,tanggal_mulai:mulai,tanggal_selesai:selesai,lokasi:lokasi,jumlah_hari:hari,iuran_per_hari:iuran,bendahara_id:bendahara||null,catatan:catatan,status:'selesai'}).select().single();
+  if(r.error){showToast('Gagal: '+r.error.message,'red');btn.disabled=false;btn.textContent='Simpan Kegiatan';return;}
+  var kegiatanId=r.data.id;
+  // Insert peserta
+  var pesertaList=[];
+  allAnggota.forEach(function(a){
+    if(selectedPeserta[a.id]){
+      pesertaList.push({kegiatan_id:kegiatanId,anggota_id:a.id,jumlah_hari:hari,nominal_iuran:hari*iuran,sudah_bayar:false});
+    }
+  });
+  if(pesertaList.length) await db.from('kegiatan_peserta').insert(pesertaList);
+  await addLog('Tambah kegiatan',nama+' - '+pesertaList.length+' peserta');
+  btn.disabled=false; btn.textContent='Simpan Kegiatan';
+  closeSheet('kegiatan'); await loadKegiatan(); renderKegiatanList(); renderRekapAnggota();
+  showToast('Kegiatan disimpan','green');
+}
+ 
+// LOG
+async function loadLogList() {
+  var r=await db.from('log_aktivitas').select('*').order('created_at',{ascending:false}).limit(50);
+  var logs=r.data||[];
+  document.getElementById('log-list').innerHTML=logs.length?logs.map(function(l){
+    var tgl=new Date(l.created_at).toLocaleDateString('id',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    return '<div class="log-item"><div class="log-aksi">'+l.aksi+(l.detail?' — '+l.detail:'')+'</div><div class="log-meta">'+(l.user_nama||'-')+' · '+tgl+'</div></div>';
+  }).join(''):'<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">Belum ada log aktivitas</div></div>';
+}
+ 
+// EKSPOR PDF
+function setPeriod(p) {
+  currentPeriod=p;
+  document.getElementById('period-bulan').className='period-btn'+(p==='bulan'?' active':'');
+  document.getElementById('period-semua').className='period-btn'+(p==='semua'?' active':'');
+  document.getElementById('period-bulan-form').style.display=p==='bulan'?'block':'none';
+}
+ 
+function eksporPDF() {
+  var data=allTrx,judulPeriode='Semua Periode';
+  if(currentPeriod==='bulan'){
+    var bulan=parseInt(document.getElementById('ekspor-bulan').value);
+    var tahun=parseInt(document.getElementById('ekspor-tahun').value);
+    data=allTrx.filter(function(t){var d=new Date(t.tanggal);return d.getMonth()===bulan&&d.getFullYear()===tahun;});
+    judulPeriode=BULAN_NAMA[bulan]+' '+tahun;
   }
+  if(!data.length){showToast('Tidak ada data untuk periode ini','yellow');return;}
+  var sorted=data.slice().sort(function(a,b){return new Date(a.tanggal)-new Date(b.tanggal);});
+  var saldo=0;
+  var rows=sorted.map(function(t,i){
+    var masuk=t.jenis==='masuk'?t.nominal:0,keluar=t.jenis==='keluar'?t.nominal:0;
+    saldo+=masuk-keluar;
+    var tgl=new Date(t.tanggal).toLocaleDateString('id',{day:'2-digit',month:'2-digit',year:'numeric'});
+    return '<tr style="border-bottom:1px solid #e5e7eb;background:'+(i%2===0?'white':'#f8fafc')+'">'
+      +'<td style="padding:7px 6px;text-align:center;font-size:12px">'+(i+1)+'</td>'
+      +'<td style="padding:7px 6px;font-size:12px">'+tgl+'</td>'
+      +'<td style="padding:7px 6px;font-size:12px">'+(t.keterangan||'-')+'</td>'
+      +'<td style="padding:7px 6px;font-size:12px">'+(t.kategori?t.kategori.nama:'-')+'</td>'
+      +'<td style="padding:7px 6px;text-align:right;font-size:12px;color:'+(masuk?'#15803d':'#9ca3af')+'">'+(masuk?'Rp '+masuk.toLocaleString('id-ID'):'-')+'</td>'
+      +'<td style="padding:7px 6px;text-align:right;font-size:12px;color:'+(keluar?'#dc2626':'#9ca3af')+'">'+(keluar?'Rp '+keluar.toLocaleString('id-ID'):'-')+'</td>'
+      +'<td style="padding:7px 6px;text-align:right;font-size:12px;font-weight:600;color:'+(saldo>=0?'#1e40af':'#dc2626')+'">'+'Rp '+Math.abs(saldo).toLocaleString('id-ID')+'</td>'
+      +'</tr>';
+  });
+  var totalMasuk=sorted.reduce(function(s,t){return t.jenis==='masuk'?s+t.nominal:s;},0);
+  var totalKeluar=sorted.reduce(function(s,t){return t.jenis==='keluar'?s+t.nominal:s;},0);
+  var saldoAkhir=totalMasuk-totalKeluar;
+  var tglCetak=new Date().toLocaleDateString('id',{day:'numeric',month:'long',year:'numeric'});
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Buku Kas WMC - '+judulPeriode+'</title>'
+    +'<style>body{font-family:Arial,sans-serif;margin:0;padding:24px;color:#111}.header{text-align:center;margin-bottom:24px;border-bottom:2px solid #1e40af;padding-bottom:16px}.logo{font-size:22px;font-weight:800;color:#1e40af;margin-bottom:4px}.sub{font-size:13px;color:#6b7280}.judul{font-size:16px;font-weight:700;margin:8px 0 2px}table{width:100%;border-collapse:collapse;margin-bottom:24px}th{background:#1e40af;color:white;padding:10px 6px;font-size:12px;text-align:left}th:nth-child(1){text-align:center}th:nth-child(5),th:nth-child(6),th:nth-child(7){text-align:right}.summary{display:flex;gap:16px;margin-top:8px}.sum-box{flex:1;border:1px solid #e5e7eb;border-radius:8px;padding:12px;text-align:center}.sum-label{font-size:11px;color:#6b7280;margin-bottom:4px}.sum-val{font-size:16px;font-weight:800}.footer{margin-top:32px;font-size:11px;color:#9ca3af;text-align:center;border-top:1px solid #e5e7eb;padding-top:12px}</style>'
+    +'</head><body><div class="header"><div class="logo">PT WIDYA MANDALA CENDEKIA</div><div class="sub">Laporan Buku Kas</div><div class="judul">Periode: '+judulPeriode+'</div><div class="sub">Dicetak: '+tglCetak+'</div></div>'
+    +'<table><thead><tr><th>No</th><th>Tanggal</th><th>Keterangan</th><th>Kategori</th><th>Masuk</th><th>Keluar</th><th>Saldo</th></tr></thead><tbody>'+rows.join('')+'</tbody></table>'
+    +'<div class="summary"><div class="sum-box"><div class="sum-label">Total Masuk</div><div class="sum-val" style="color:#15803d">Rp '+totalMasuk.toLocaleString('id-ID')+'</div></div><div class="sum-box"><div class="sum-label">Total Keluar</div><div class="sum-val" style="color:#dc2626">Rp '+totalKeluar.toLocaleString('id-ID')+'</div></div><div class="sum-box"><div class="sum-label">Saldo Akhir</div><div class="sum-val" style="color:'+(saldoAkhir>=0?'#1e40af':'#dc2626')+'">Rp '+Math.abs(saldoAkhir).toLocaleString('id-ID')+'</div></div></div>'
+    +'<div class="footer">WMC Kas v2.0 · PT Widya Mandala Cendekia · '+tglCetak+' · '+sorted.length+' transaksi</div></body></html>';
+  var win=window.open('','_blank'); win.document.write(html); win.document.close(); win.onload=function(){win.print();};
+  showToast('Membuka preview PDF...','green');
 }
-
-async function deletePosKas(id) {
-  if (!confirm('Hapus posisi kas ini?')) return;
-  var r = await db.from('posisi_kas').update({ aktif: false }).eq('id', id);
-  if (!r.error) { await loadKas(); loadPosKasPage(); showToast('Posisi kas dihapus', 'green'); }
-  else showToast('Gagal menghapus', 'red');
+ 
+// PENGGUNA
+async function loadUsers() {
+  var r=await db.from('profiles').select('*').order('created_at');
+  var users=r.data||[];
+  var roleColor={admin:'var(--accent)',bendahara:'var(--green)',input_only:'var(--yellow)',viewer:'var(--text3)'};
+  var roleLabel={admin:'Admin',bendahara:'Bendahara',input_only:'Input Only',viewer:'Viewer'};
+  document.getElementById('user-list').innerHTML=users.length?users.map(function(u){
+    return '<div class="admin-item"><div class="admin-item-icon">'+u.nama.charAt(0).toUpperCase()+'</div>'
+      +'<div class="admin-item-info"><div class="admin-item-name">'+u.nama+'</div><div class="admin-item-sub">'+u.email+'</div>'
+      +'<div style="font-size:11px;font-weight:700;color:'+(roleColor[u.role]||'var(--text2)')+';margin-top:3px">'+(roleLabel[u.role]||u.role)+'</div></div>'
+      +'<div class="admin-item-actions"><button class="btn-sm btn-sm-edit" onclick="editUser(\''+u.id+'\',\''+u.nama+'\',\''+u.email+'\',\''+u.role+'\')">Edit</button>'
+      +(u.id!==currentUser.id?'<button class="btn-sm btn-sm-del" onclick="deleteUser(\''+u.id+'\')">Hapus</button>':'')
+      +'</div></div>';
+  }).join(''):'<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-text">Belum ada pengguna</div></div>';
 }
-
+function openSheetUser(){document.getElementById('user-sheet-title').textContent='Tambah Pengguna';document.getElementById('edit-user-id').value='';document.getElementById('user-nama').value='';document.getElementById('user-email').value='';document.getElementById('user-pass').value='';document.getElementById('user-role').value='viewer';document.getElementById('user-email').disabled=false;openSheet('user');}
+function editUser(id,nama,email,role){document.getElementById('user-sheet-title').textContent='Edit Pengguna';document.getElementById('edit-user-id').value=id;document.getElementById('user-nama').value=nama;document.getElementById('user-email').value=email;document.getElementById('user-email').disabled=true;document.getElementById('user-pass').value='';document.getElementById('user-role').value=role;openSheet('user');}
+async function submitUser(){var editId=document.getElementById('edit-user-id').value,nama=document.getElementById('user-nama').value.trim(),role=document.getElementById('user-role').value;if(!nama){showToast('Nama wajib diisi','red');return;}var btn=document.getElementById('btn-submit-user');btn.disabled=true;btn.textContent='Menyimpan...';if(!editId){showToast('Buat akun lewat Supabase Dashboard, lalu edit role di sini','yellow');btn.disabled=false;btn.textContent='Simpan Pengguna';closeSheet('user');return;}var r=await db.from('profiles').update({nama:nama,role:role}).eq('id',editId);btn.disabled=false;btn.textContent='Simpan Pengguna';if(!r.error){closeSheet('user');loadUsers();showToast('Pengguna diperbarui','green');}else showToast('Gagal: '+r.error.message,'red');}
+async function deleteUser(id){if(!confirm('Hapus pengguna ini?'))return;var r=await db.from('profiles').delete().eq('id',id);if(!r.error){loadUsers();showToast('Pengguna dihapus','green');}else showToast('Gagal menghapus','red');}
+ 
+// KATEGORI
+function renderKategoriPage(){var masuk=allKategori.filter(function(k){return k.jenis==='masuk';}),keluar=allKategori.filter(function(k){return k.jenis==='keluar';});function katItem(k){var isAdmin=currentProfile&&currentProfile.role==='admin';return '<div class="kat-manage-item"><div class="kat-color-dot" style="background:'+k.warna+'"></div><div class="kat-manage-name">'+k.nama+'</div>'+(isAdmin?'<button class="btn-sm btn-sm-edit" onclick="editKat(\''+k.id+'\',\''+k.nama+'\',\''+k.jenis+'\',\''+k.warna+'\')">Edit</button>':'')+(isAdmin?'<button class="btn-sm btn-sm-del" onclick="deleteKat(\''+k.id+'\')">Hapus</button>':'')+'</div>';}document.getElementById('kat-masuk-list').innerHTML=masuk.map(katItem).join('')||'<div style="color:var(--text3);font-size:13px;padding:8px 0">Belum ada</div>';document.getElementById('kat-keluar-list').innerHTML=keluar.map(katItem).join('')||'<div style="color:var(--text3);font-size:13px;padding:8px 0">Belum ada</div>';}
+function openSheetKat(jenis){document.getElementById('kat-sheet-title').textContent='Tambah Kategori';document.getElementById('edit-kat-id').value='';document.getElementById('kat-nama').value='';currentKatJenis=jenis||'masuk';selectedColor='#22d172';setKatJenis(currentKatJenis);buildColorGrid();openSheet('kat');}
+function editKat(id,nama,jenis,warna){document.getElementById('kat-sheet-title').textContent='Edit Kategori';document.getElementById('edit-kat-id').value=id;document.getElementById('kat-nama').value=nama;currentKatJenis=jenis;selectedColor=warna;setKatJenis(jenis);buildColorGrid();openSheet('kat');}
+function setKatJenis(jenis){currentKatJenis=jenis;document.getElementById('kat-jenis-masuk').className='jenis-btn'+(jenis==='masuk'?' active masuk':'');document.getElementById('kat-jenis-keluar').className='jenis-btn'+(jenis==='keluar'?' active keluar':'');}
+function buildColorGrid(){var el=document.getElementById('color-grid');if(!el)return;el.innerHTML=COLORS.map(function(c){return '<div class="color-dot'+(selectedColor===c?' selected':'')+'" style="background:'+c+'" onclick="selectColor(\''+c+'\')"></div>';}).join('');}
+function selectColor(c){selectedColor=c;buildColorGrid();}
+async function submitKat(){var editId=document.getElementById('edit-kat-id').value,nama=document.getElementById('kat-nama').value.trim();if(!nama){showToast('Nama wajib diisi','red');return;}var btn=document.getElementById('btn-submit-kat');btn.disabled=true;btn.textContent='Menyimpan...';var payload={nama:nama,jenis:currentKatJenis,warna:selectedColor};var r=editId?await db.from('kategori').update(payload).eq('id',editId):await db.from('kategori').insert(Object.assign(payload,{aktif:true,urutan:99}));btn.disabled=false;btn.textContent='Simpan Kategori';if(!r.error){closeSheet('kat');await loadKategori();renderKategoriPage();showToast('Kategori disimpan','green');}else showToast('Gagal: '+r.error.message,'red');}
+async function deleteKat(id){if(!confirm('Hapus kategori ini?'))return;var r=await db.from('kategori').update({aktif:false}).eq('id',id);if(!r.error){await loadKategori();renderKategoriPage();showToast('Kategori dihapus','green');}else showToast('Gagal menghapus','red');}
+ 
+// POSISI KAS
+async function loadPosKasPage(){await loadKas();var icons={tunai:'💵',bank:'🏦',ewallet:'📱'};document.getElementById('poskas-list').innerHTML=allKas.length?allKas.map(function(k){return '<div class="admin-item"><div class="admin-item-icon">'+(icons[k.tipe]||'💰')+'</div><div class="admin-item-info"><div class="admin-item-name">'+k.nama+'</div><div class="admin-item-sub">'+k.tipe.toUpperCase()+(k.nomor_rekening?' · '+k.nomor_rekening:'')+'</div></div><div class="admin-item-actions"><button class="btn-sm btn-sm-edit" onclick="editKas(\''+k.id+'\',\''+k.nama+'\',\''+k.tipe+'\',\''+(k.nomor_rekening||'')+'\')">Edit</button><button class="btn-sm btn-sm-del" onclick="deletePosKas(\''+k.id+'\')">Hapus</button></div></div>';}).join(''):'<div class="empty-state"><div class="empty-icon">🏦</div><div class="empty-text">Belum ada posisi kas</div></div>';}
+function openSheetKas(){document.getElementById('kas-sheet-title').textContent='Tambah Posisi Kas';document.getElementById('edit-kas-id').value='';document.getElementById('kas-nama').value='';document.getElementById('kas-norek').value='';currentKasTipe='tunai';setKasTipe('tunai');openSheet('kas');}
+function editKas(id,nama,tipe,norek){document.getElementById('kas-sheet-title').textContent='Edit Posisi Kas';document.getElementById('edit-kas-id').value=id;document.getElementById('kas-nama').value=nama;document.getElementById('kas-norek').value=norek;currentKasTipe=tipe;setKasTipe(tipe);openSheet('kas');}
+function setKasTipe(tipe){currentKasTipe=tipe;['tunai','bank','ewallet'].forEach(function(t){document.getElementById('kas-tipe-'+t).className='tipe-btn'+(tipe===t?' active':'');});}
+async function submitKas(){var editId=document.getElementById('edit-kas-id').value,nama=document.getElementById('kas-nama').value.trim(),norek=document.getElementById('kas-norek').value.trim();if(!nama){showToast('Nama wajib diisi','red');return;}var btn=document.getElementById('btn-submit-kas');btn.disabled=true;btn.textContent='Menyimpan...';var payload={nama:nama,tipe:currentKasTipe,nomor_rekening:norek||null};var r=editId?await db.from('posisi_kas').update(payload).eq('id',editId):await db.from('posisi_kas').insert(Object.assign(payload,{aktif:true,urutan:99}));btn.disabled=false;btn.textContent='Simpan Posisi Kas';if(!r.error){closeSheet('kas');await loadKas();loadPosKasPage();populateKasSelect();renderKasBreakdown();showToast('Posisi kas disimpan','green');}else showToast('Gagal: '+r.error.message,'red');}
+async function deletePosKas(id){if(!confirm('Hapus posisi kas ini?'))return;var r=await db.from('posisi_kas').update({aktif:false}).eq('id',id);if(!r.error){await loadKas();loadPosKasPage();showToast('Posisi kas dihapus','green');}else showToast('Gagal menghapus','red');}
+ 
 // UTILS
-
-function formatRp(num) {
-  if (num === undefined || num === null) return 'Rp 0';
-  return 'Rp ' + Math.abs(Math.round(num)).toLocaleString('id-ID');
-}
-
-function showToast(msg, type) {
-  type = type || '';
-  var t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast show ' + type;
-  setTimeout(function() { t.className = 'toast'; }, 3000);
-}
+function formatRp(num){if(!num)return 'Rp 0';return 'Rp '+Math.abs(Math.round(num)).toLocaleString('id-ID');}
+function showToast(msg,type){type=type||'';var t=document.getElementById('toast');t.textContent=msg;t.className='toast show '+type;setTimeout(function(){t.className='toast';},3000);}
+ 
