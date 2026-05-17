@@ -166,7 +166,7 @@ function openDetail(id) {
 }
 
 async function deleteBukti(trxId, buktiUrl) {
-  if (!confirm('Hapus bukti?')) return;
+  if (!window.confirm('Hapus bukti?')) return;
   var path = buktiUrl.split('/bukti-transaksi/')[1];
   if (path) await db.storage.from('bukti-transaksi').remove([decodeURIComponent(path)]);
   await db.from('transaksi').update({ bukti_url: null }).eq('id', trxId);
@@ -203,7 +203,7 @@ function openEditTrx(id) {
 }
 
 async function deleteTrx(id) {
-  if (!confirm('Hapus transaksi ini?')) return;
+  if (!window.confirm('Hapus transaksi ini?')) return;
   var r = await db.from('transaksi').update({ status: 'batal' }).eq('id', id);
   if (!r.error) { closeSheet('detail'); await loadTrx(); renderDashboard(); renderTrxList(); showToast('Transaksi dihapus', 'green'); }
   else showToast('Gagal menghapus', 'red');
@@ -348,7 +348,7 @@ async function submitKat() {
   else showToast('Gagal: ' + r.error.message, 'red');
 }
 async function deleteKat(id) {
-  if (!confirm('Hapus kategori ini?')) return;
+  if (!window.confirm('Hapus kategori ini?')) return;
   var r = await db.from('kategori').update({ aktif: false }).eq('id', id);
   if (!r.error) { await loadKategori(); renderKategoriPage(); showToast('Kategori dihapus', 'green'); }
   else showToast('Gagal menghapus', 'red');
@@ -380,7 +380,7 @@ async function submitKas() {
   else showToast('Gagal: ' + r.error.message, 'red');
 }
 async function deletePosKas(id) {
-  if (!confirm('Hapus posisi kas ini?')) return;
+  if (!window.confirm('Hapus posisi kas ini?')) return;
   var r = await db.from('posisi_kas').update({ aktif: false }).eq('id', id);
   if (!r.error) { await loadKas(); loadPosKasPage(); showToast('Posisi kas dihapus', 'green'); }
   else showToast('Gagal menghapus', 'red');
