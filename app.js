@@ -180,29 +180,28 @@ function goPage(name) {
 async function doLogin() {
   var email = document.getElementById('login-email').value.trim();
   var pass = document.getElementById('login-pass').value;
-  var errEl = document.getElementById('login-error');
   var btn = document.getElementById('btn-login');
+  if (!email || !pass) { showAuthError('Email dan password wajib diisi'); return; }
+  btn.innerHTML = '<div class="spinner"></div>'; btn.disabled = true;
   
-  if (!email || !pass) {
-    errEl.textContent = 'Email dan password harus diisi';
-    errEl.style.display = 'block';
-    return;
+  // Perbaikan: Menggunakan 'login-error' agar sesuai dengan file index.html
+  var errEl = document.getElementById('login-error');
+  if (errEl) errEl.style.display = 'none';
+  
+  var r = await db.auth.signInWithPassword({ email: email, password: pass });
+  if (r.error) { 
+    showAuthError('Email atau password salah'); 
+    btn.innerHTML = '<span>Masuk</span>'; 
+    btn.disabled = false; 
   }
-  
-  btn.disabled = true;
-  btn.textContent = 'Mencoba Masuk...';
-  errEl.style.display = 'none';
-  
-  var res = await db.auth.signInWithPassword({ email: email, password: pass });
-  if (res.error) {
-    errEl.textContent = 'Gagal masuk: ' + res.error.message;
-    errEl.style.display = 'block';
-    btn.disabled = false;
-    btn.textContent = 'Masuk';
-  } else {
-    btn.disabled = false;
-    btn.textContent = 'Masuk';
-    // Event onAuthStateChange akan menangani proses kelanjutan aplikasi secara aman
+}
+
+function showAuthError(msg) { 
+  // Perbaikan: Menggunakan 'login-error' agar sesuai dengan file index.html
+  var el = document.getElementById('login-error'); 
+  if (el) {
+    el.textContent = msg; 
+    el.style.display = 'block'; 
   }
 }
 
