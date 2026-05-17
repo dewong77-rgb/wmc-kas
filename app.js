@@ -105,19 +105,35 @@ function showAuth() {
 }
 
 async function showApp() {
-  document.getElementById('auth-screen').style.display = 'none';
-  document.getElementById('app').style.display = 'flex';
+  var authEl = document.getElementById('auth-screen');
+  var appEl = document.getElementById('app');
+  
+  if (authEl) authEl.style.display = 'none';
+  if (appEl) appEl.style.display = 'flex';
   
   var errEl = document.getElementById('login-error');
   if (errEl) errEl.style.display = 'none';
   
   // TUNGGU PROSES AMBIL DATA UTAMA SELESAI
-  // Ini memastikan sistem tahu Anda adalah Admin Penuh SEBELUM halaman dibuka
-  await loadAll();
+  // Ditambahkan try-catch agar jika tabel Supabase 404, aplikasi TIDAK MACET/BLANK
+  try {
+    await loadAll();
+  } catch (e) {
+    console.error("Gagal memuat beberapa data Supabase:", e);
+  }
   
   if (currentProfile) {
-    document.getElementById('header-user').textContent = currentProfile.nama;
+    var headerUserEl = document.getElementById('header-user');
+    if (headerUserEl) {
+      headerUserEl.textContent = currentProfile.nama || '';
+    }
   }
+  
+  updateProfilePage();
+  
+  // Setelah data profile & role siap, baru buka dashboard agar tombol "+" muncul
+  goPage('dashboard');
+}
   
   updateProfilePage();
   
@@ -780,15 +796,28 @@ async function deletePosKas(id) {
 
 function updateProfilePage() {
   if (!currentProfile) return;
-  document.getElementById('prof-nama').textContent = currentProfile.nama;
-  document.getElementById('prof-email').textContent = currentUser ? currentUser.email : '-';
+  
+  // PENGAMAN: Cek satu per satu apakah elemen HTML-nya ada sebelum mengisi teks
+  var profNamaEl = document.getElementById('prof-nama');
+  if (profNamaEl) {
+    profNamaEl.textContent = currentProfile.nama || '';
+  }
+  
+  var profEmailEl = document.getElementById('prof-email');
+  if (profEmailEl) {
+    profEmailEl.textContent = (currentUser && currentUser.email) ? currentUser.email : '-';
+  }
   
   var rName = 'Viewer';
-  var r = currentProfile.role.toString().toLowerCase().trim();
+  var r = currentProfile.role ? currentProfile.role.toString().toLowerCase().trim() : 'viewer';
   if (r === 'admin') rName = 'Admin Penuh';
   if (r === 'bendahara') rName = 'Bendahara';
   if (r === 'input_only') rName = 'Operator Input';
-  document.getElementById('prof-role').textContent = rName;
+  
+  var profRoleEl = document.getElementById('prof-role');
+  if (profRoleEl) {
+    profRoleEl.textContent = rName;
+  }
   
   var menus = document.getElementById('admin-menus');
   if (menus) {
