@@ -127,19 +127,21 @@ function renderRekapAnggota() {
       var ds = divisiStats[d];
       var jmlAnggota = Object.keys(ds.anggotaSet).length;
       var jmlAktif = Object.keys(ds.aktifSet).length;
+      var jmlBelum = jmlAnggota - jmlAktif;
       var totalKegiatan = ds.hadir + ds.pinjam;
       var pctHadir = totalKegiatan > 0 ? Math.round((ds.hadir / totalKegiatan) * 100) : 0;
       var pctPinjam = totalKegiatan > 0 ? Math.round((ds.pinjam / totalKegiatan) * 100) : 0;
 
-      return '<div style="padding:10px 0;border-bottom:1px solid var(--border)">'
-        // Baris nama tim + angka
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
-        + '<div style="font-size:13px;font-weight:700">' + d
-        + ' <span style="font-size:11px;color:var(--text3);font-weight:400">' + jmlAnggota + ' anggota'
-        + (jmlAktif < jmlAnggota ? ' · <span style="color:var(--yellow)">' + (jmlAnggota - jmlAktif) + ' belum ikut</span>' : '') + '</span>'
-        + '</div>'
-        + '<div style="font-size:12px;color:var(--text2)">' + totalKegiatan + 'x ikut</div>'
-        + '</div>'
+return '<div style="padding:10px 0;border-bottom:1px solid var(--border)">'
+  + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'
+  + '<div style="font-size:13px;font-weight:700">' + d + '</div>'
+  + '<div style="font-size:12px;color:var(--text2)">' + totalKegiatan + 'x ikut</div>'
+  + '</div>'
+  + '<div style="font-size:11px;color:var(--text2);margin-bottom:6px">'
+  + jmlAnggota + ' anggota'
+  + ' · <span style="color:var(--green)">' + jmlAktif + ' aktif</span>'
+  + (jmlBelum > 0 ? ' · <span style="color:var(--yellow)">' + jmlBelum + ' belum pernah ikut</span>' : '')
+  + '</div>'
         // Progress bar hadir vs pinjam
         + (totalKegiatan > 0
           ? '<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;margin-bottom:4px">'
