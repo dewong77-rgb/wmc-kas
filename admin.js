@@ -75,7 +75,7 @@ async function submitAnggaran() {
 }
 
 async function deleteAnggaran(id) {
-  if (!confirm('Hapus anggaran ini?')) return;
+  if (!window.confirm('Hapus anggaran ini?')) return;
   var r = await db.from('anggaran').delete().eq('id', id);
   if (!r.error) { await loadAnggaran(); renderAnggaranPage(); showToast('Anggaran dihapus', 'green'); }
   else showToast('Gagal menghapus', 'red');
@@ -130,7 +130,7 @@ async function submitUser() {
 }
 
 async function deleteUser(id) {
-  if (!confirm('Hapus pengguna ini?')) return;
+  if (!window.confirm('Hapus pengguna ini?')) return;
   var r = await db.from('profiles').delete().eq('id', id);
   if (!r.error) { loadUsers(); showToast('Pengguna dihapus', 'green'); }
   else showToast('Gagal menghapus', 'red');
