@@ -148,7 +148,7 @@ function renderRekapAnggota() {
             + '</div>';
         }).join('')
       // Pager dengan margin bottom ekstra agar tidak ketutup nav
-      + '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 24px">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 100px">'
       + '<button class="pager-btn" ' + (rekapPage === 0 ? 'disabled' : '') + ' onclick="rekapPage=Math.max(0,rekapPage-1);renderRekapAnggota()">← Sebelumnya</button>'
       + '<span style="font-size:13px;color:var(--text2)">' + (rekapPage+1) + ' / ' + (maxP+1) + ' (' + sorted.length + ')</span>'
       + '<button class="pager-btn" ' + (rekapPage >= maxP ? 'disabled' : '') + ' onclick="rekapPage=Math.min('+maxP+',rekapPage+1);renderRekapAnggota()">Berikutnya →</button>'
@@ -188,7 +188,7 @@ function renderDataAnggota() {
       + '</div>';
   }).join('');
   var maxP = Math.ceil(allAnggota.length / PAGE_SIZE) - 1;
-  el.innerHTML += '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 24px">'
+  el.innerHTML += '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 100px">'
     + '<button class="pager-btn" ' + (anggotaPage === 0 ? 'disabled' : '') + ' onclick="anggotaPage=Math.max(0,anggotaPage-1);renderDataAnggota()">← Sebelumnya</button>'
     + '<span style="font-size:13px;color:var(--text2)">' + (anggotaPage+1) + ' / ' + (maxP+1) + ' (' + allAnggota.length + ' anggota)</span>'
     + '<button class="pager-btn" ' + (anggotaPage >= maxP ? 'disabled' : '') + ' onclick="anggotaPage=Math.min('+maxP+',anggotaPage+1);renderDataAnggota()">Berikutnya →</button>'
@@ -276,7 +276,7 @@ function renderKegiatanList() {
       + '</div>';
   }).join('');
   var maxP = Math.ceil(sorted.length / PAGE_SIZE) - 1;
-  el.innerHTML += '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 24px">'
+  el.innerHTML += '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 100px">'
     + '<button class="pager-btn" ' + (kegiatanPage === 0 ? 'disabled' : '') + ' onclick="kegiatanPage=Math.max(0,kegiatanPage-1);renderKegiatanList()">← Sebelumnya</button>'
     + '<span style="font-size:13px;color:var(--text2)">' + (kegiatanPage+1) + ' / ' + (maxP+1) + ' (' + sorted.length + ' kegiatan)</span>'
     + '<button class="pager-btn" ' + (kegiatanPage >= maxP ? 'disabled' : '') + ' onclick="kegiatanPage=Math.min('+maxP+',kegiatanPage+1);renderKegiatanList()">Berikutnya →</button>'
