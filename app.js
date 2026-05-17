@@ -114,8 +114,6 @@ async function showApp() {
   var errEl = document.getElementById('login-error');
   if (errEl) errEl.style.display = 'none';
   
-  // TUNGGU PROSES AMBIL DATA UTAMA SELESAI
-  // Ditambahkan try-catch agar jika tabel Supabase 404, aplikasi TIDAK MACET/BLANK
   try {
     await loadAll();
   } catch (e) {
@@ -130,16 +128,9 @@ async function showApp() {
   }
   
   updateProfilePage();
-  
-  // Setelah data profile & role siap, baru buka dashboard agar tombol "+" muncul
   goPage('dashboard');
 }
   
-  updateProfilePage();
-  
-  // Setelah data profile & role siap, baru buka dashboard agar tombol "+" muncul
-  goPage('dashboard');
-}
 
 function goPage(name) {
   document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
@@ -797,7 +788,6 @@ async function deletePosKas(id) {
 function updateProfilePage() {
   if (!currentProfile) return;
   
-  // PENGAMAN: Cek satu per satu apakah elemen HTML-nya ada sebelum mengisi teks
   var profNamaEl = document.getElementById('prof-nama');
   if (profNamaEl) {
     profNamaEl.textContent = currentProfile.nama || '';
@@ -825,7 +815,6 @@ function updateProfilePage() {
     else menus.style.display = 'none';
   }
 }
-
 async function loadUsers() {
   var list = document.getElementById('users-list');
   if (!list) return;
