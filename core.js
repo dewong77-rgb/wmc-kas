@@ -112,8 +112,8 @@ function goPage(name) {
   if (navMap[name] !== undefined) {
     document.querySelectorAll('.nav-item')[navMap[name]].classList.add('active');
   }
-  var noFab = ['profil','kategori','pengguna','poskas','ekspor'];
-  document.getElementById('fab').style.display = noFab.indexOf(name) < 0 ? 'flex' : 'none';
+  var canAddTrx = currentProfile && (currentProfile.role === 'admin' || currentProfile.role === 'bendahara' || currentProfile.role === 'input_only');
+  document.getElementById('fab').style.display = (name === 'transaksi' && canAddTrx) ? 'flex' : 'none';
   var titles = {
     dashboard:'WMC Kas', transaksi:'Transaksi', anggaran:'Anggaran',
     anggota:'Anggota & Kegiatan', profil:'Profil', pengguna:'Pengguna',
