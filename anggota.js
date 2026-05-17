@@ -228,7 +228,7 @@ async function submitAnggota() {
   else showToast('Gagal: ' + r.error.message, 'red');
 }
 async function deleteAnggota(id) {
-  if (!confirm('Hapus anggota ini?')) return;
+  if (!window.confirm('Hapus anggota ini?')) return;
   var r = await db.from('anggota').delete().eq('id', id);
   if (!r.error) { await loadAnggota(); renderDataAnggota(); showToast('Anggota dihapus', 'green'); }
   else showToast('Gagal menghapus', 'red');
@@ -437,7 +437,7 @@ async function submitKegiatan() {
 }
 
 async function deleteKegiatan(id) {
-  if (!confirm('Hapus kegiatan ini?')) return;
+  if (!window.confirm('Hapus kegiatan ini?')) return;
   await db.from('kegiatan_peserta').delete().eq('kegiatan_id', id);
   var r = await db.from('kegiatan').delete().eq('id', id);
   if (!r.error) { loadKegiatan(); showToast('Kegiatan dihapus', 'green'); }
