@@ -1,7 +1,7 @@
 // WMC KAS - core.js
 // Ganti dua baris ini dengan credentials Supabase kamu
-var SUPABASE_URL = 'ISI_SUPABASE_URL_DISINI';
-var SUPABASE_KEY = 'ISI_SUPABASE_ANON_KEY_DISINI';
+var SUPABASE_URL = 'https://urseszjkqxivvaarjqro.supabase.co';
+var SUPABASE_KEY = 'sb_publishable_il7NmuQEiyuVHzzF3XU37A_bLM_We4Q';
 
 // Global state
 var db = null;
