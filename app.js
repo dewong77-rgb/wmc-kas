@@ -1,6 +1,6 @@
 // WMC KAS - app.js v2.4 (Optimized Version)
 var SUPABASE_URL = 'https://urseszjkqxivvaarjqro.supabase.co';
-var SUPABASE_KEY = 'sb_publishable_il7NmuQEiyuVHzzF3XU37A_bLM_We4Q ';
+var SUPABASE_KEY = 'sb_publishable_il7NmuQEiyuVHzzF3XU37A_bLM_We4Q';
 
 var db = null;
 var currentUser = null;
