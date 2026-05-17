@@ -272,10 +272,10 @@ function renderDataAnggota() {
     + '<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Komposisi Tim (' + allAnggota.length + ' anggota)</div>'
     + '<div style="display:flex;flex-wrap:wrap;gap:6px">'
     + Object.keys(divisiMap).sort().map(function(d) {
-        return '<div style="background:var(--bg2);border-radius:20px;padding:4px 12px;font-size:12px">'
-          + '<span style="color:var(--text2)">' + d + '</span>'
-          + ' <span style="font-weight:800;color:var(--accent)">' + divisiMap[d] + '</span>'
-          + '</div>';
+     return '<div style="background:var(--bg2);border-radius:20px;padding:4px 12px;font-size:12px;cursor:pointer" onclick="filterByDivisi(\'' + escQ(d) + '\')">'
+    + '<span style="color:var(--text2)">' + d + '</span>'
+    + ' <span style="font-weight:800;color:var(--accent)">' + divisiMap[d] + '</span>'
+    + '</div>';
       }).join('')
     + '</div></div>';
 
@@ -324,7 +324,11 @@ function onSearchAnggota(val) {
   anggotaPage = 0;
   renderDataAnggota();
 }
-
+function filterByDivisi(divisi) {
+  searchAnggota = divisi;
+  anggotaPage = 0;
+  renderDataAnggota();
+}
 function openSheetAnggota() {
   document.getElementById('anggota-sheet-title').textContent = 'Tambah Anggota';
   ['edit-anggota-id','anggota-nama','anggota-jabatan','anggota-kontak','anggota-email','anggota-catatan'].forEach(function(id) { document.getElementById(id).value = ''; });
