@@ -280,15 +280,11 @@ function goPage(name) {
   var canInput = ['admin', 'bendahara', 'input_only'].indexOf(cleanRole) >= 0;
   
   var fabEl = document.getElementById('fab');
-  if (fabEl) {
-    if (noFab.indexOf(name) < 0 && canInput) {
-      fabEl.style.setProperty('display', 'flex', 'important');
-      fabEl.style.display = 'flex'; // baris cadangan penegas
-    } else {
-      fabEl.style.setProperty('display', 'none', 'important');
-      fabEl.style.display = 'none'; // baris cadangan penegas
-    }
-  }
+if (fabEl) {
+  // PAKSA MUNCUL DI MANAPUN UNTUK TESTING HTML
+  fabEl.style.setProperty('display', 'flex', 'important');
+  fabEl.style.display = 'flex';
+}
   
   var titles = { dashboard:'WMC Kas', transaksi:'Transaksi', anggaran:'Anggaran', anggota:'Anggota & Kegiatan', profil:'Profil', pengguna:'Pengguna', kategori:'Kategori', poskas:'Posisi Kas', ekspor:'Ekspor Laporan' };
   var titleHeader = document.getElementById('header-title');
