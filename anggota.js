@@ -261,6 +261,24 @@ function renderDataAnggota() {
   var isAdmin = currentProfile && currentProfile.role === 'admin';
   var el = document.getElementById('data-anggota-list');
 
+  // Ringkasan per divisi
+  var divisiMap = {};
+  allAnggota.forEach(function(a) {
+    var div = a.jabatan || 'Tanpa Divisi';
+    if (!divisiMap[div]) divisiMap[div] = 0;
+    divisiMap[div]++;
+  });
+  var divisiHTML = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:12px">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Komposisi Tim (' + allAnggota.length + ' anggota)</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:6px">'
+    + Object.keys(divisiMap).sort().map(function(d) {
+        return '<div style="background:var(--bg2);border-radius:20px;padding:4px 12px;font-size:12px">'
+          + '<span style="color:var(--text2)">' + d + '</span>'
+          + ' <span style="font-weight:800;color:var(--accent)">' + divisiMap[d] + '</span>'
+          + '</div>';
+      }).join('')
+    + '</div></div>';
+
   // Search bar
   var searchBar = '<div style="position:relative;margin-bottom:12px">'
     + '<span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px;pointer-events:none">🔍</span>'
@@ -274,7 +292,7 @@ function renderDataAnggota() {
   });
 
   if (!filtered.length) {
-    el.innerHTML = searchBar + '<div style="color:var(--text3);font-size:13px;padding:16px 0;text-align:center">Tidak ditemukan</div>';
+    el.innerHTML = divisiHTML + searchBar + '<div style="color:var(--text3);font-size:13px;padding:16px 0;text-align:center">Tidak ditemukan</div>';
     return;
   }
 
@@ -282,7 +300,7 @@ function renderDataAnggota() {
   var slice = filtered.slice(start, start + PAGE_SIZE);
   var maxP = Math.ceil(filtered.length / PAGE_SIZE) - 1;
 
-  el.innerHTML = searchBar + slice.map(function(a) {
+  el.innerHTML = divisiHTML + searchBar + slice.map(function(a) {
     return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;display:flex;align-items:center;gap:12px;margin-bottom:8px">'
       + '<div class="anggota-avatar" style="width:38px;height:38px;border-radius:10px;font-size:15px;flex-shrink:0">' + a.nama.charAt(0).toUpperCase() + '</div>'
       + '<div style="flex:1;min-width:0">'
@@ -301,7 +319,6 @@ function renderDataAnggota() {
   + '<button class="pager-btn" ' + (anggotaPage >= maxP ? 'disabled' : '') + ' onclick="anggotaPage=Math.min('+maxP+',anggotaPage+1);renderDataAnggota()">Berikutnya →</button>'
   + '</div>';
 }
-
 function onSearchAnggota(val) {
   searchAnggota = val;
   anggotaPage = 0;
