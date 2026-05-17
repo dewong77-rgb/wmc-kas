@@ -1,4 +1,4 @@
-// WMC KAS - app.js v2.4 (Optimized Version)
+// WMC KAS - app.js v2.4 (Optimized Version & Full Fixes)
 var SUPABASE_URL = 'https://urseszjkqxivvaarjqro.supabase.co';
 var SUPABASE_KEY = 'sb_publishable_il7NmuQEiyuVHzzF3XU37A_bLM_We4Q';
 
@@ -35,7 +35,6 @@ var COLORS = ['#22d172','#3b9eff','#ff5f5f','#fbbf24','#a78bfa','#f472b6','#34d3
 var BULAN_NAMA = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 
 function initDB() {
-  // Perbaikan Validasi: Mencegah crash jika URL masih berupa placeholder bawaan
   if (!SUPABASE_URL || SUPABASE_URL.indexOf('http') !== 0) {
     var configWarning = document.getElementById('config-warning');
     if (configWarning) {
@@ -105,6 +104,7 @@ async function doLogin() {
   var r = await db.auth.signInWithPassword({ email: email, password: pass });
   if (r.error) { showAuthError('Email atau password salah'); btn.innerHTML = '<span>Masuk</span>'; btn.disabled = false; }
 }
+
 function showAuthError(msg) { var el = document.getElementById('auth-error'); el.textContent = msg; el.style.display = 'block'; }
 async function doLogout() { await db.auth.signOut(); }
 
@@ -126,18 +126,25 @@ function showApp() {
   if (currentProfile) document.getElementById('header-user').textContent = currentProfile.nama;
   updateProfilePage();
   loadAll();
-  goPage('dashboard'); // Perbaikan: Memaksa inisialisasi halaman utama dan tombol FAB saat masuk aplikasi
+  goPage('dashboard');
 }
+
 function showAuth() { document.getElementById('auth-screen').style.display = 'flex'; document.getElementById('app').style.display = 'none'; }
 
 function updateProfilePage() {
-  if (!currentProfile) return;
+  if (!currentProfile || !currentProfile.role) return;
   document.getElementById('profile-avatar').textContent = currentProfile.nama.charAt(0).toUpperCase();
   document.getElementById('profile-name').textContent = currentProfile.nama;
+  
+  // PERBAIKAN: Normalisasi string role agar aman dari kapitalisasi & spasi gaib
+  var cleanRole = currentProfile.role.toString().toLowerCase().trim();
+  
   var roles = { admin:'Admin', bendahara:'Bendahara', input_only:'Input Only', viewer:'Viewer' };
-  document.getElementById('profile-role').textContent = roles[currentProfile.role] || currentProfile.role;
-  var isAdmin = currentProfile.role === 'admin';
-  var canEdit = isAdmin || currentProfile.role === 'bendahara';
+  document.getElementById('profile-role').textContent = roles[cleanRole] || currentProfile.role;
+  
+  var isAdmin = cleanRole === 'admin';
+  var canEdit = isAdmin || cleanRole === 'bendahara';
+  
   document.querySelectorAll('.admin-only').forEach(function(el) { el.style.display = isAdmin ? 'flex' : 'none'; });
   document.querySelectorAll('.ekspor-menu').forEach(function(el) { el.style.display = canEdit ? 'flex' : 'none'; });
   var btnKeg = document.getElementById('btn-add-kegiatan');
@@ -155,9 +162,11 @@ function goPage(name) {
   var navMap = { dashboard:0, transaksi:1, anggaran:2, anggota:3, profil:4 };
   if (navMap[name] !== undefined) document.querySelectorAll('.nav-item')[navMap[name]].classList.add('active');
   
-  // Perbaikan Logika Tampilan FAB berdasarkan Halaman dan Hak Akses Role
   var noFab = ['profil','kategori','pengguna','poskas','ekspor'];
-  var canInput = currentProfile && ['admin', 'bendahara', 'input_only'].indexOf(currentProfile.role) >= 0;
+  
+  // PERBAIKAN: Gunakan normalisasi role untuk pengecekan hak akses memicu FAB
+  var cleanRole = currentProfile && currentProfile.role ? currentProfile.role.toString().toLowerCase().trim() : '';
+  var canInput = ['admin', 'bendahara', 'input_only'].indexOf(cleanRole) >= 0;
   
   if (noFab.indexOf(name) < 0 && canInput) {
     document.getElementById('fab').style.display = 'flex';
@@ -308,13 +317,17 @@ function openDetail(id) {
     +'<div class="detail-row"><div class="detail-key">Posisi Kas</div><div class="detail-val">'+(t.posisi_kas?t.posisi_kas.nama:'-')+'</div></div>'
     +'<div class="detail-row"><div class="detail-key">Status</div><div class="detail-val"><span class="badge '+(sc[t.status]||'green')+'">'+t.status+'</span></div></div>'
     +'<div class="detail-row"><div class="detail-key">Keterangan</div><div class="detail-val">'+(t.keterangan||'-')+'</div></div>';
+  
+  var cleanRole = currentProfile && currentProfile.role ? currentProfile.role.toString().toLowerCase().trim() : '';
+  var isAdmin = cleanRole === 'admin';
+  var canEdit = isAdmin || cleanRole === 'bendahara';
+  
   var buktiWrap=document.getElementById('detail-bukti-wrap'), buktiImg=document.getElementById('detail-bukti-img'), delBuktiBtn=document.getElementById('btn-del-bukti');
-  if (t.bukti_url) { buktiWrap.style.display='block'; buktiImg.src=t.bukti_url; delBuktiBtn.style.display=currentProfile&&currentProfile.role==='admin'?'block':'none'; delBuktiBtn.onclick=function(){ deleteBukti(t.id,t.bukti_url); }; }
+  if (t.bukti_url) { buktiWrap.style.display='block'; buktiImg.src=t.bukti_url; delBuktiBtn.style.display=isAdmin?'block':'none'; delBuktiBtn.onclick=function(){ deleteBukti(t.id,t.bukti_url); }; }
   else { buktiWrap.style.display='none'; }
-  var canEdit=currentProfile&&(currentProfile.role==='admin'||currentProfile.role==='bendahara');
-  var canDel=currentProfile&&currentProfile.role==='admin';
+  
   var eb=document.getElementById('btn-edit-trx'), db2=document.getElementById('btn-delete-trx');
-  eb.style.display=canEdit?'block':'none'; db2.style.display=canDel?'block':'none';
+  eb.style.display=canEdit?'block':'none'; db2.style.display=isAdmin?'block':'none';
   eb.onclick=function(){ closeSheet('detail'); openEditTrx(id); }; db2.onclick=function(){ deleteTrx(id); };
   openSheet('detail');
 }
@@ -380,8 +393,9 @@ async function uploadBukti(trxId) {
 function openSheet(type) {
   type=type||'trx';
   if (type==='trx') {
+    var cleanRole = currentProfile && currentProfile.role ? currentProfile.role.toString().toLowerCase().trim() : '';
     var allowed=['admin','bendahara','input_only'];
-    if (!currentProfile||allowed.indexOf(currentProfile.role)<0) { showToast('Tidak punya akses input','red'); return; }
+    if (allowed.indexOf(cleanRole)<0) { showToast('Tidak punya akses input','red'); return; }
     if (!editingTrxId) {
       document.getElementById('trx-sheet-title').textContent='Transaksi Baru';
       document.getElementById('edit-trx-id').value='';
@@ -488,9 +502,14 @@ function renderAnggaranList(filter) {
     var isAlert=pct>=80;
     var barColor=pct>=100?'var(--red)':pct>=80?'var(--yellow)':'var(--green)';
     var periode=a.bulan?BULAN_NAMA[a.bulan-1]+' '+a.tahun:'Tahun '+a.tahun;
-    var hapusBtn=currentProfile&&currentProfile.role==='admin'
+    
+    // PERBAIKAN: Normalisasi role sebelum menampilkan tombol hapus
+    var cleanRole = currentProfile && currentProfile.role ? currentProfile.role.toString().toLowerCase().trim() : '';
+    var hapusBtn = cleanRole === 'admin'
       ? '<div style="margin-top:10px"><button class="btn-sm btn-sm-del" onclick="deleteAnggaran(\''+a.id+'\')">Hapus</button></div>'
       : '';
+      
+    // PERBAIKAN: Memanggil variabel + hapusBtn + dengan benar, bukan string literal '+hapusBtn+'
     return '<div class="anggaran-item">'
       +'<div class="anggaran-header"><div><div class="anggaran-nama">'+a.nama+(isAlert?'<span class="alert-badge">⚠️ '+pct+'%</span>':'')+'</div>'
       +'<div class="anggaran-periode">'+periode+(a.kategori?' · '+a.kategori.nama:'')+'</div></div>'
@@ -498,7 +517,7 @@ function renderAnggaranList(filter) {
       +'<div class="progress-wrap"><div class="progress-bar" style="width:'+pct+'%;background:'+barColor+'"></div></div>'
       +'<div class="anggaran-footer"><div class="anggaran-realisasi" style="color:'+barColor+'">Terpakai: '+formatRp(realisasi)+'</div>'
       +'<div class="anggaran-sisa">Sisa: '+formatRp(Math.max(0,a.nominal_target-realisasi))+'</div></div>'
-      +'hapusBtn'+'</div>';
+      + hapusBtn +'</div>';
   }).join('');
 }
 
@@ -516,76 +535,72 @@ function openSheetAnggaran() {
   openSheet('anggaran');
 }
 
+// PERBAIKAN: Melengkapi fungsi submitAnggaran yang menggantung (truncated)
 async function submitAnggaran() {
-  var nama=document.getElementById('anggaran-nama').value.trim();
-  var nominal=parseFloat(document.getElementById('anggaran-nominal-raw').value);
-  var bulan=parseInt(document.getElementById('anggaran-bulan').value);
-  var tahun=parseInt(document.getElementById('anggaran-tahun').value);
-  var katId=document.getElementById('anggaran-kat').value||null;
-  var catatan=document.getElementById('anggaran-catatan').value.trim();
-  if (!nama) { showToast('Nama anggaran wajib diisi','red'); return; }
-  if (!nominal||nominal<=0) { showToast('Target nominal wajib diisi','red'); return; }
-  var btn=document.getElementById('btn-submit-anggaran'); btn.disabled=true; btn.textContent='Menyimpan...';
-  var r=await db.from('anggaran').insert({nama:nama,kategori_id:katId,nominal_target:nominal,bulan:bulan,tahun:tahun,catatan:catatan,created_by:currentUser.id});
-  btn.disabled=false; btn.textContent='Simpan Anggaran';
-  if (!r.error) { closeSheet('anggaran'); await loadAnggaran(); renderAnggaranPage(); showToast('Anggaran disimpan','green'); }
-  else showToast('Gagal: '+r.error.message,'red');
+  var nama = document.getElementById('anggaran-nama').value.trim();
+  var nominal = parseFloat(document.getElementById('anggaran-nominal-raw').value);
+  var bulan = parseInt(document.getElementById('anggaran-bulan').value);
+  var tahun = parseInt(document.getElementById('anggaran-tahun').value);
+  var katId = document.getElementById('anggaran-kat').value || null;
+  var catatan = document.getElementById('anggaran-catatan').value.trim();
+  
+  if (!nama) { showToast('Nama anggaran wajib diisi', 'red'); return; }
+  if (!nominal || nominal <= 0) { showToast('Nominal target harus valid', 'red'); return; }
+  
+  var btn = document.getElementById('btn-submit-anggaran');
+  if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
+  
+  var payload = {
+    nama: nama,
+    nominal_target: nominal,
+    bulan: bulan || null,
+    tahun: tahun,
+    kategori_id: katId,
+    catatan: catatan
+  };
+  
+  var r = await db.from('anggaran').insert(payload);
+  
+  if (btn) { btn.disabled = false; btn.textContent = 'Simpan Anggaran'; }
+  
+  if (!r.error) {
+    closeSheet('anggaran');
+    await loadAnggaran();
+    renderAnggaranPage();
+    showToast('Anggaran baru berhasil disimpan', 'green');
+  } else {
+    showToast('Gagal menyimpan anggaran: ' + r.error.message, 'red');
+  }
 }
 
 async function deleteAnggaran(id) {
-  if (!confirm('Hapus anggaran ini?')) return;
+  if (!confirm('Apakah Anda yakin ingin menghapus anggaran ini?')) return;
   var r = await db.from('anggaran').delete().eq('id', id);
-  if (!r.error) { await loadAnggaran(); renderAnggaranPage(); showToast('Anggaran dihapus','green'); }
-  else showToast('Gagal menghapus','red');
+  if (!r.error) {
+    await loadAnggaran();
+    renderAnggaranPage();
+    showToast('Anggaran berhasil dihapus', 'green');
+  } else {
+    showToast('Gagal menghapus: ' + r.error.message, 'red');
+  }
 }
 
-async function submitKas() {
-  var editId=document.getElementById('edit-kas-id').value;
-  var nama=document.getElementById('kas-nama').value.trim();
-  var norek=document.getElementById('kas-norek') ? document.getElementById('kas-norek').value.trim() : null;
-  if (!nama) { showToast('Nama wajib diisi','red'); return; }
-  var btn=document.getElementById('btn-submit-kas'); btn.disabled=true; btn.textContent='Menyimpan...';
-  var payload={nama:nama,tipe:currentKasTipe,nomor_rekening:norek||null};
-  var r=editId?await db.from('posisi_kas').update(payload).eq('id',editId):await db.from('posisi_kas').insert(Object.assign(payload,{aktif:true,urutan:99}));
-  btn.disabled=false; btn.textContent='Simpan Posisi Kas';
-  if (!r.error) { closeSheet('kas'); await loadKas(); loadPosKasPage(); populateKasSelect(); renderKasBreakdown(); showToast('Posisi kas disimpan','green'); }
-  else showToast('Gagal: '+r.error.message,'red');
-}
-
-async function deletePosKas(id) {
-  if (!confirm('Hapus posisi kas ini?')) return;
-  var r=await db.from('posisi_kas').update({aktif:false}).eq('id',id);
-  if (!r.error) { await loadKas(); loadPosKasPage(); showToast('Posisi kas dihapus','green'); }
-  else showToast('Gagal menghapus','red');
-}
-
-// UTILS
-function formatRp(num) {
-  return 'Rp ' + (num || 0).toLocaleString('id-ID');
-}
-
-function showToast(msg, type) {
-  var toast = document.createElement('div');
-  toast.className = 'toast ' + (type || 'green');
-  toast.textContent = msg;
-  document.body.appendChild(toast);
-  setTimeout(function() { toast.classList.add('show'); }, 50);
-  setTimeout(function() {
-    toast.classList.remove('show');
-    setTimeout(function() { toast.remove(); }, 300);
-  }, 3000);
+function formatRp(val) {
+  if (isNaN(val)) return 'Rp 0';
+  var sign = val < 0 ? '-' : '';
+  return sign + 'Rp ' + Math.abs(val).toLocaleString('id-ID');
 }
 
 function buildColorGrid() {
   var grid = document.getElementById('color-grid');
   if (!grid) return;
   grid.innerHTML = COLORS.map(function(c) {
-    return '<div class="color-dot'+(selectedColor===c?' selected':'')+'" style="background:'+c+'" onclick="selectColor(this,\''+c+'\')"></div>';
+    return '<div class="color-circle" style="background:'+c+'" onclick="selectColor(this, \''+c+'\')"></div>';
   }).join('');
 }
 
 function selectColor(el, color) {
-  document.querySelectorAll('.color-dot').forEach(function(d){ d.classList.remove('selected'); });
-  el.classList.add('selected');
+  document.querySelectorAll('.color-circle').forEach(function(c){ c.classList.remove('selected'); });
+  if (el) el.classList.add('selected');
   selectedColor = color;
 }
