@@ -297,6 +297,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     if (e.key === 'Enter') doLogin();
   });
   document.getElementById('trx-search').addEventListener('input', function(e) {
+    currentTrxPage = 0;
     renderTrxList(e.target.value);
   });
 
