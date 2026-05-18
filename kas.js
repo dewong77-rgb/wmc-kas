@@ -1,5 +1,6 @@
 // WMC KAS - kas.js
 var activeFilter = 'all';
+var currentTrxPage = 0;
 var selectedKatId = null;
 var currentJenis = 'masuk';
 var editingTrxId = null;
@@ -179,8 +180,19 @@ function renderTrxList(search) {
     }
     return true;
   });
+  var trxPage = typeof currentTrxPage !== 'undefined' ? currentTrxPage : 0;
+  var start = trxPage * 10;
+  var slice = filtered.slice(start, start + 10);
+  var maxP = Math.ceil(filtered.length / 10) - 1;
   document.getElementById('trx-all').innerHTML = filtered.length
-    ? filtered.map(trxHTML).join('')
+    ? slice.map(trxHTML).join('')
+      + (filtered.length > 10
+        ? '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 20px">'
+          + '<button class="pager-btn" ' + (trxPage === 0 ? 'disabled' : '') + ' onclick="currentTrxPage=Math.max(0,currentTrxPage-1);renderTrxList()">← Sebelumnya</button>'
+          + '<span style="font-size:13px;color:var(--text2)">' + (trxPage+1) + ' / ' + (maxP+1) + ' (' + filtered.length + ')</span>'
+          + '<button class="pager-btn" ' + (trxPage >= maxP ? 'disabled' : '') + ' onclick="currentTrxPage=Math.min('+maxP+',currentTrxPage+1);renderTrxList()">Berikutnya →</button>'
+          + '</div>'
+        : '')
     : '<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">Tidak ada transaksi</div></div>';
 }
 
