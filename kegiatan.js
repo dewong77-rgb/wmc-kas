@@ -8,35 +8,40 @@ var filterKegiatanBulan = 0;
 var filterKegiatanTahun = 0;
 
 function renderKegiatanList() {
-  var tipeClass = { fullboard:'tipe-fullboard', perjadin:'tipe-perjadin', rapat:'tipe-rapat', lainnya:'tipe-lainnya' };
-  var canEdit = currentProfile && (currentProfile.role === 'admin' || currentProfile.role === 'bendahara');
   var el = document.getElementById('kegiatan-list');
-
   var years = {};
   allKegiatan.forEach(function(k) { var tgl = k.tanggal_surat || k.tanggal_mulai; if (tgl) years[new Date(tgl).getFullYear()] = true; });
   var yearList = Object.keys(years).sort(function(a,b){ return b-a; });
 
-  var searchBar = '<div style="margin-bottom:12px">'
-    + '<div style="position:relative;margin-bottom:8px">'
-    + '<span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px;pointer-events:none">🔍</span>'
-    + '<input type="search" placeholder="Cari nama kegiatan..." value="' + escQ(searchKegiatan) + '" oninput="onSearchKegiatan(this.value)" style="width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px 10px 38px;color:var(--text);font-family:var(--font);font-size:14px;outline:none">'
-    + '</div>'
-    + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
-    + '<select id="keg-sel-bulan" style="background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text);font-size:12px;font-family:var(--font);outline:none" onchange="onFilterKegiatanChange()">'
-    + '<option value="0">Semua Bulan</option>'
-    + BULAN_NAMA.map(function(b,i){ return '<option value="'+(i+1)+'"'+(filterKegiatanBulan===i+1?' selected':'')+'>'+b+'</option>'; }).join('')
-    + '</select>'
-    + '<select id="keg-sel-tahun" style="background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text);font-size:12px;font-family:var(--font);outline:none" onchange="onFilterKegiatanChange()">'
-    + '<option value="0">Semua Tahun</option>'
-    + yearList.map(function(y){ return '<option value="'+y+'"'+(filterKegiatanTahun===parseInt(y)?' selected':'')+'>'+y+'</option>'; }).join('')
-    + '</select>'
-    + '</div></div>';
+  // Render search bar sekali saja — tidak ikut re-render
+  var searchWrap = document.getElementById('kegiatan-search-wrap');
+  if (!searchWrap || !searchWrap.dataset.init) {
+    el.innerHTML = '<div id="kegiatan-search-wrap" style="margin-bottom:12px">'
+      + '<div style="position:relative;margin-bottom:8px">'
+      + '<span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px;pointer-events:none">🔍</span>'
+      + '<input type="search" id="kegiatan-search-input" placeholder="Cari nama kegiatan..." style="width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px 10px 38px;color:var(--text);font-family:var(--font);font-size:14px;outline:none">'
+      + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+      + '<select id="keg-sel-bulan" style="background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text);font-size:12px;font-family:var(--font);outline:none" onchange="onFilterKegiatanChange()">'
+      + '<option value="0">Semua Bulan</option>'
+      + BULAN_NAMA.map(function(b,i){ return '<option value="'+(i+1)+'"'+(filterKegiatanBulan===i+1?' selected':'')+'>'+b+'</option>'; }).join('')
+      + '</select>'
+      + '<select id="keg-sel-tahun" style="background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text);font-size:12px;font-family:var(--font);outline:none" onchange="onFilterKegiatanChange()">'
+      + '<option value="0">Semua Tahun</option>'
+      + yearList.map(function(y){ return '<option value="'+y+'"'+(filterKegiatanTahun===parseInt(y)?' selected':'')+'>'+y+'</option>'; }).join('')
+      + '</select>'
+      + '</div>'
+      + '<div id="kegiatan-content"></div>'
+      + '</div>';
+    document.getElementById('kegiatan-search-wrap').dataset.init = '1';
+    document.getElementById('kegiatan-search-input').addEventListener('input', function(e) {
+      onSearchKegiatan(e.target.value);
+    });
+  }
+  renderKegiatanContent();
+}
 
-  var sorted = allKegiatan.slice().sort(function(a, b) {
-    var da = a.tanggal_surat ? new Date(a.tanggal_surat) : new Date(a.tanggal_mulai);
-    var db2 = b.tanggal_surat ? new Date(b.tanggal_surat) : new Date(b.tanggal_mulai);
-    return db2 - da;
-  });
+function renderKegiatanContent() {
 
   var filtered = sorted.filter(function(k) {
     if (searchKegiatan && k.nama.toLowerCase().indexOf(searchKegiatan.toLowerCase()) < 0) return false;
@@ -48,13 +53,13 @@ function renderKegiatanList() {
     return true;
   });
 
-  if (!filtered.length) { el.innerHTML = searchBar + '<div style="color:var(--text3);font-size:13px;padding:16px 0;text-align:center">Tidak ada kegiatan ditemukan</div>'; return; }
-
+  var contentEl = document.getElementById('kegiatan-content');
+  if (!contentEl) return;
+  if (!filtered.length) { contentEl.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:16px 0;text-align:center">Tidak ada kegiatan ditemukan</div>'; return; }
   var start = kegiatanPage * PAGE_SIZE;
   var slice = filtered.slice(start, start + PAGE_SIZE);
   var maxP = Math.ceil(filtered.length / PAGE_SIZE) - 1;
-
-  el.innerHTML = searchBar + slice.map(function(k) {
+  contentEl.innerHTML = slice.map(function(k) {
     var jp = k.kegiatan_peserta ? k.kegiatan_peserta.length : 0;
     var jh = k.kegiatan_peserta ? k.kegiatan_peserta.filter(function(p){ return p.status_kehadiran !== 'pinjam_nama'; }).length : 0;
     var jpin = k.kegiatan_peserta ? k.kegiatan_peserta.filter(function(p){ return p.status_kehadiran === 'pinjam_nama'; }).length : 0;
@@ -81,7 +86,7 @@ function renderKegiatanList() {
   + '</div>';
 }
 
-function onSearchKegiatan(val) { searchKegiatan = val; kegiatanPage = 0; renderKegiatanList(); }
+function onSearchKegiatan(val) { searchKegiatan = val; kegiatanPage = 0; renderKegiatanContent(); }
 function onFilterKegiatanChange() {
   var b = document.getElementById('keg-sel-bulan');
   var t = document.getElementById('keg-sel-tahun');
