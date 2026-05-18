@@ -200,6 +200,7 @@ function setFilter(el, val) {
   document.querySelectorAll('.filter-chip').forEach(function(c) { c.classList.remove('active'); });
   el.classList.add('active');
   activeFilter = val;
+  currentTrxPage = 0;
   renderTrxList(document.getElementById('trx-search').value);
 }
 
