@@ -256,28 +256,26 @@
 
     <!-- DASHBOARD -->
     <div class="page active" id="page-dashboard">
+      <div id="dash-filter-wrap"></div>
       <div class="saldo-card">
         <div class="saldo-label">Total Saldo WMC</div>
         <div class="saldo-amount" id="saldo-total">Memuat...</div>
         <div class="saldo-row">
-          <div class="saldo-pill"><div class="saldo-pill-label">Masuk Bulan Ini</div><div class="saldo-pill-val green" id="masuk-bulan">—</div></div>
-          <div class="saldo-pill"><div class="saldo-pill-label">Keluar Bulan Ini</div><div class="saldo-pill-val red" id="keluar-bulan">—</div></div>
+          <div class="saldo-pill"><div class="saldo-pill-label">Pemasukan <span id="dash-periode-label" style="font-size:10px;opacity:0.7"></span></div><div class="saldo-pill-val green" id="masuk-bulan">—</div></div>
+          <div class="saldo-pill"><div class="saldo-pill-label">Pengeluaran</div><div class="saldo-pill-val red" id="keluar-bulan">—</div></div>
         </div>
       </div>
       <div class="stats-row">
-        <div class="stat-card"><div class="stat-icon">📊</div><div class="stat-label">Net Bulan Ini</div><div class="stat-val" id="net-bulan">—</div></div>
+        <div class="stat-card"><div class="stat-icon">📊</div><div class="stat-label">Net Periode</div><div class="stat-val" id="net-bulan">—</div></div>
         <div class="stat-card"><div class="stat-icon">🧾</div><div class="stat-label">Total Transaksi</div><div class="stat-val" id="trx-count">—</div></div>
       </div>
       <div class="pie-card">
         <div class="pie-title">Komposisi Keuangan</div>
         <div class="pie-wrap"><svg width="110" height="110" viewBox="0 0 110 110" id="pie-svg"></svg><div class="pie-legend" id="pie-legend"></div></div>
       </div>
-      <div class="top-kat-card"><div class="section-header" style="margin-bottom:14px"><div class="section-title">Top Pemasukan Bulan Ini</div></div><div id="top-masuk"></div></div>
-      <div class="top-kat-card"><div class="section-header" style="margin-bottom:14px"><div class="section-title">Top Pengeluaran Bulan Ini</div></div><div id="top-keluar"></div></div>
-      <div class="section-header"><div class="section-title">Posisi Kas</div></div>
-      <div class="kas-breakdown" id="kas-breakdown"></div>
-      <div class="section-header"><div class="section-title">Transaksi Terbaru</div><div class="section-link" onclick="goPage('transaksi')">Lihat semua →</div></div>
-      <div class="trx-list" id="trx-recent"></div>
+      <div class="top-kat-card"><div class="section-header" style="margin-bottom:14px"><div class="section-title">Top Pemasukan</div></div><div id="top-masuk"></div></div>
+      <div class="top-kat-card"><div class="section-header" style="margin-bottom:14px"><div class="section-title">Top Pengeluaran per Kategori</div></div><div id="top-keluar"></div></div>
+      <div class="top-kat-card"><div class="section-header" style="margin-bottom:14px"><div class="section-title">Pemasukan per Kegiatan</div></div><div id="top-kegiatan"></div></div>
     </div>
 
     <!-- TRANSAKSI -->
