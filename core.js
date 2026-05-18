@@ -183,7 +183,7 @@ async function loadKas() {
 }
 async function loadTrx() {
   var r = await db.from('transaksi')
-    .select('*, kategori(nama,warna,jenis), posisi_kas(nama,tipe)')
+    .select('*, kategori(nama,warna,jenis), posisi_kas(nama,tipe), kegiatan(nama)')
     .neq('status', 'batal')
     .order('tanggal', { ascending: false })
     .limit(500);
