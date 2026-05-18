@@ -102,9 +102,10 @@ function renderKasBreakdown() {
 function trxHTML(t) {
   var katNama = t.kategori ? t.kategori.nama : '-';
   var tgl = new Date(t.tanggal).toLocaleDateString('id', { day: 'numeric', month: 'short', year: 'numeric' });
+  var kegNama = t.kegiatan ? ' · 📅 ' + t.kegiatan.nama : '';
   return '<div class="trx-item" onclick="openDetail(\'' + t.id + '\')">'
     + '<div class="trx-dot ' + t.jenis + '"></div>'
-    + '<div class="trx-info"><div class="trx-ket">' + (t.keterangan || katNama) + '</div><div class="trx-meta">' + tgl + ' · ' + katNama + (t.bukti_url ? ' · 📎' : '') + '</div></div>'
+    + '<div class="trx-info"><div class="trx-ket">' + (t.keterangan || katNama) + '</div><div class="trx-meta">' + tgl + ' · ' + katNama + kegNama + (t.bukti_url ? ' · 📎' : '') + '</div></div>'
     + '<div class="trx-nominal ' + t.jenis + '">' + (t.jenis === 'masuk' ? '+' : '-') + formatRp(t.nominal) + '</div>'
     + '</div>';
 }
