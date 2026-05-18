@@ -386,6 +386,7 @@
   </div>
   <div class="form-group" style="margin-top:16px"><label class="form-label">Status</label><select id="trx-status" class="form-input"><option value="lunas">Lunas</option><option value="pending">Pending</option></select></div>
   <div class="form-group" id="trx-kegiatan-wrap" style="display:none"><label class="form-label">Kegiatan terkait <span style="color:var(--text3)">(opsional)</span></label><select id="trx-kegiatan" class="form-input"><option value="">Tidak terkait kegiatan</option></select></div>
+  <div class="form-group" id="trx-pos-wrap" style="display:none"><label class="form-label">Pos Anggaran <span style="color:var(--text3)">(opsional)</span></label><select id="trx-pos" class="form-input"><option value="">Tidak terkait pos anggaran</option></select></div>
   <div class="form-group"><label class="form-label">Keterangan</label><input type="text" id="trx-ket" class="form-input" placeholder="Deskripsi singkat..."></div>
   <div class="form-group">
     <label class="form-label">Bukti <span style="color:var(--text3)">(opsional, maks. 200KB)</span></label>
@@ -405,6 +406,7 @@
     <img id="detail-bukti-img" class="bukti-img" onclick="window.open(this.src,'_blank')">
     <button class="btn-del-bukti" id="btn-del-bukti">🗑 Hapus Bukti</button>
   </div>
+  <button class="btn-edit-trx" id="btn-alokasi-trx" style="display:none;width:100%;margin-bottom:8px;background:var(--accent-dim);color:var(--accent);border:1.5px solid var(--accent)">📊 Alokasi ke Pos</button>
   <div class="detail-actions">
     <button class="btn-edit-trx" id="btn-edit-trx">✏️ Edit</button>
     <button class="btn-delete-trx" id="btn-delete-trx">🗑 Hapus</button>
@@ -503,7 +505,32 @@
   <div class="form-group"><label class="form-label">Nomor Rekening (opsional)</label><input type="text" id="kas-norek" class="form-input" placeholder="xxxx-xxxx-xxxx"></div>
   <button class="btn-submit" id="btn-submit-kas" onclick="submitKas()">Simpan Posisi Kas</button>
 </div></div>
+<!-- SHEET: POS ANGGARAN -->
+<div class="overlay" id="overlay-pos"><div class="sheet" id="sheet-pos">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title" id="pos-sheet-title">Tambah Pos Anggaran</div>
+  <input type="hidden" id="edit-pos-id">
+  <div class="form-group"><label class="form-label">Nama Pos</label><input type="text" id="pos-nama" class="form-input" placeholder="Contoh: Operasional, Kegiatan Tim"></div>
+  <div class="form-group"><label class="form-label">Deskripsi <span style="color:var(--text3)">(opsional)</span></label><input type="text" id="pos-deskripsi" class="form-input" placeholder="Keterangan singkat"></div>
+  <div class="form-group"><label class="form-label">Persentase Alokasi (%)</label><input type="number" id="pos-pct" class="form-input" placeholder="Contoh: 30" min="0" max="100"></div>
+  <div class="form-group"><label class="form-label">Warna</label><div id="pos-color-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:8px"></div></div>
+  <button class="btn-submit" id="btn-submit-pos" onclick="submitPos()">Simpan Pos</button>
+</div></div>
 
+<!-- SHEET: ALOKASI MASUK -->
+<div class="overlay" id="overlay-alokasi"><div class="sheet" id="sheet-alokasi">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Alokasi Pemasukan ke Pos</div>
+  <input type="hidden" id="alokasi-trx-id">
+  <div style="font-size:13px;color:var(--text2);margin-bottom:16px">Atur alokasi <span id="alokasi-total-label" style="color:var(--green);font-weight:700"></span> ke masing-masing pos. Edit nominal jika perlu.</div>
+  <div id="alokasi-list"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-top:1px solid var(--border);margin-top:4px">
+    <span style="font-size:13px;color:var(--text2)">Selisih:</span>
+    <span id="alokasi-selisih" style="font-size:13px;font-weight:700"></span>
+  </div>
+  <button class="btn-submit" id="btn-submit-alokasi" onclick="submitAlokasi()">Simpan Draft Alokasi</button>
+</div></div>
+  
 <div class="toast" id="toast"></div>
 
 <!-- Load JS berurutan: core dulu, lalu modul -->
