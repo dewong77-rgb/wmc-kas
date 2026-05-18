@@ -502,7 +502,7 @@
   <div class="form-group"><label class="form-label">Nama</label><input type="text" id="kas-nama" class="form-input" placeholder="Nama kas/rekening"></div>
   <div class="form-group"><label class="form-label">Tipe</label><div style="display:grid;grid-template-columns:1fr 1fr 1fr;background:var(--bg);border-radius:var(--radius-sm);padding:4px;gap:4px"><div class="tipe-btn active" id="kas-tipe-tunai" onclick="setKasTipe('tunai')">💵 Tunai</div><div class="tipe-btn" id="kas-tipe-bank" onclick="setKasTipe('bank')">🏦 Bank</div><div class="tipe-btn" id="kas-tipe-ewallet" onclick="setKasTipe('ewallet')">📱 E-Wallet</div></div></div>
   <div class="form-group"><label class="form-label">Nomor Rekening (opsional)</label><input type="text" id="kas-norek" class="form-input" placeholder="xxxx-xxxx-xxxx"></div>
-  <button class="btn-submit" onclick="submitKas()">Simpan Posisi Kas</button>
+  <button class="btn-submit" id="btn-submit-kas" onclick="submitKas()">Simpan Posisi Kas</button>
 </div></div>
 
 <div class="toast" id="toast"></div>
