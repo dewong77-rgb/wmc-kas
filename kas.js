@@ -334,7 +334,10 @@ function setJenis(jenis) {
 function populateKegiatanSelect(selectedId) {
   var sel = document.getElementById('trx-kegiatan');
   if (!sel) return;
-  var sorted = allKegiatan.slice().sort(function(a, b) {
+  var sudahAda = {};
+  allTrx.forEach(function(t){ if (t.jenis === 'masuk' && t.kegiatan_id) sudahAda[t.kegiatan_id] = true; });
+  var allKegiatanFiltered = allKegiatan.filter(function(k){ return !sudahAda[k.id] || k.id === selectedId; });
+  var sorted = allKegiatanFiltered.slice().sort(function(a, b) {
     var da = a.tanggal_surat ? new Date(a.tanggal_surat) : new Date(a.tanggal_mulai);
     var db2 = b.tanggal_surat ? new Date(b.tanggal_surat) : new Date(b.tanggal_mulai);
     return db2 - da;
