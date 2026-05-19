@@ -98,6 +98,10 @@ function renderKegiatanContent() {
       return p.status_kehadiran === 'pinjam_nama' ? '<span style="color:var(--yellow)">' + nm + '*</span>' : nm;
     }).join(', ') : '';
     var pinjamText = jpin > 0 ? ' · <span style="color:var(--yellow)">' + jpin + ' pinjam nama</span>' : '';
+    var totalMasukKeg = allTrx.filter(function(t){ return t.jenis === 'masuk' && t.kegiatan_id === k.id; }).reduce(function(s,t){ return s + t.nominal; }, 0);
+    var statusUang = totalMasukKeg > 0
+    ? '<div style="font-size:11px;font-weight:700;color:var(--green);margin-top:6px">✅ Pemasukan sudah diinput · ' + formatRp(totalMasukKeg) + '</div>'
+    : '<div style="font-size:11px;font-weight:700;color:var(--yellow);margin-top:6px">⏳ Belum ada pemasukan diinput</div>';
     return '<div class="kegiatan-item">'
       + '<div class="kegiatan-header"><div class="kegiatan-nama">' + k.nama + '</div><div class="kegiatan-tipe ' + (tipeClass[k.tipe] || '') + '">' + k.tipe + '</div></div>'
       + (k.nomor_surat ? '<div style="font-size:11px;color:var(--accent);margin-bottom:4px">📄 ' + k.nomor_surat + (tglSurat ? ' · ' + tglSurat : '') + '</div>' : '')
@@ -107,6 +111,8 @@ function renderKegiatanContent() {
       + '<span style="font-size:12px;color:var(--text2)">' + jp + ' peserta · ' + jh + ' hadir' + pinjamText + '</span>'
       + (k.link_surat ? '<a href="' + k.link_surat + '" target="_blank" style="font-size:12px;color:var(--accent);text-decoration:none;font-weight:600">📎 Buka Surat Tugas</a>' : '')
       + '</div>'
+      + statusUang
+      + (canEdit ? '<div style="display:flex;gap:8px;margin-top:10px">
       + (canEdit ? '<div style="display:flex;gap:8px;margin-top:10px">'
         + '<button class="btn-sm btn-sm-edit" onclick="editKegiatan(\'' + k.id + '\')">Edit</button>'
         + '<button class="btn-sm btn-sm-del" onclick="deleteKegiatan(\'' + k.id + '\')">Hapus</button>'
