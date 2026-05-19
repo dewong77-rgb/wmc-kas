@@ -58,13 +58,11 @@ function renderKegiatanList() {
 function renderKegiatanContent() {
   var tipeClass = { fullboard:'tipe-fullboard', perjadin:'tipe-perjadin', rapat:'tipe-rapat', lainnya:'tipe-lainnya' };
   var canEdit = currentProfile && (currentProfile.role === 'admin' || currentProfile.role === 'bendahara');
-
   var sorted = allKegiatan.slice().sort(function(a, b) {
     var da = a.tanggal_surat ? new Date(a.tanggal_surat) : new Date(a.tanggal_mulai);
     var db2 = b.tanggal_surat ? new Date(b.tanggal_surat) : new Date(b.tanggal_mulai);
     return db2 - da;
   });
-
   var filtered = sorted.filter(function(k) {
     if (searchKegiatan && k.nama.toLowerCase().indexOf(searchKegiatan.toLowerCase()) < 0) return false;
     if (filterKegiatanBulan > 0 || filterKegiatanTahun > 0) {
@@ -74,7 +72,43 @@ function renderKegiatanContent() {
     }
     return true;
   });
-
+  var contentEl = document.getElementById('kegiatan-content');
+  if (!contentEl) return;
+  if (!filtered.length) { contentEl.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:16px 0;text-align:center">Tidak ada kegiatan ditemukan</div>'; return; }
+  var start = kegiatanPage * PAGE_SIZE;
+  var slice = filtered.slice(start, start + PAGE_SIZE);
+  var maxP = Math.ceil(filtered.length / PAGE_SIZE) - 1;
+  contentEl.innerHTML = slice.map(function(k) {
+    var jp = k.kegiatan_peserta ? k.kegiatan_peserta.length : 0;
+    var jh = k.kegiatan_peserta ? k.kegiatan_peserta.filter(function(p){ return p.status_kehadiran !== 'pinjam_nama'; }).length : 0;
+    var jpin = k.kegiatan_peserta ? k.kegiatan_peserta.filter(function(p){ return p.status_kehadiran === 'pinjam_nama'; }).length : 0;
+    var tglMulai = new Date(k.tanggal_mulai).toLocaleDateString('id', { day: 'numeric', month: 'short', year: 'numeric' });
+    var tglSurat = k.tanggal_surat ? new Date(k.tanggal_surat).toLocaleDateString('id', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+    var namaList = k.kegiatan_peserta ? k.kegiatan_peserta.map(function(p){ var nm = p.anggota ? p.anggota.nama : '?'; return p.status_kehadiran === 'pinjam_nama' ? '<span style="color:var(--yellow)">' + nm + '*</span>' : nm; }).join(', ') : '';
+    var pinjamText = jpin > 0 ? ' · <span style="color:var(--yellow)">' + jpin + ' pinjam nama</span>' : '';
+    var totalMasuk = allTrx.filter(function(t){ return t.jenis === 'masuk' && t.kegiatan_id === k.id; }).reduce(function(s,t){ return s + t.nominal; }, 0);
+    var statusUang = totalMasuk > 0
+      ? '<div style="font-size:11px;font-weight:700;color:var(--green);margin-top:6px">✅ Pemasukan sudah diinput · ' + formatRp(totalMasuk) + '</div>'
+      : '<div style="font-size:11px;font-weight:700;color:var(--yellow);margin-top:6px">⏳ Belum ada pemasukan diinput</div>';
+    return '<div class="kegiatan-item">'
+      + '<div class="kegiatan-header"><div class="kegiatan-nama">' + k.nama + '</div><div class="kegiatan-tipe ' + (tipeClass[k.tipe] || '') + '">' + k.tipe + '</div></div>'
+      + (k.nomor_surat ? '<div style="font-size:11px;color:var(--accent);margin-bottom:4px">📄 ' + k.nomor_surat + (tglSurat ? ' · ' + tglSurat : '') + '</div>' : '')
+      + '<div class="kegiatan-meta">Pelaksanaan: ' + tglMulai + (k.lokasi ? ' · ' + k.lokasi : '') + (k.bendahara ? ' · PIC: ' + k.bendahara.nama : '') + '</div>'
+      + (namaList ? '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;line-height:1.6">' + namaList + '</div>' : '')
+      + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">'
+      + '<span style="font-size:12px;color:var(--text2)">' + jp + ' peserta · ' + jh + ' hadir' + pinjamText + '</span>'
+      + (k.link_surat ? '<a href="' + k.link_surat + '" target="_blank" style="font-size:12px;color:var(--accent);text-decoration:none;font-weight:600">📎 Buka Surat Tugas</a>' : '')
+      + '</div>'
+      + statusUang
+      + (canEdit ? '<div style="display:flex;gap:8px;margin-top:10px"><button class="btn-sm btn-sm-edit" onclick="editKegiatan(\'' + k.id + '\')">Edit</button><button class="btn-sm btn-sm-del" onclick="deleteKegiatan(\'' + k.id + '\')">Hapus</button></div>' : '')
+      + '</div>';
+  }).join('')
+  + '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 100px">'
+  + '<button class="pager-btn" ' + (kegiatanPage === 0 ? 'disabled' : '') + ' onclick="kegiatanPage=Math.max(0,kegiatanPage-1);renderKegiatanContent()">← Sebelumnya</button>'
+  + '<span style="font-size:13px;color:var(--text2)">' + (kegiatanPage+1) + ' / ' + (maxP+1) + ' (' + filtered.length + ')</span>'
+  + '<button class="pager-btn" ' + (kegiatanPage >= maxP ? 'disabled' : '') + ' onclick="kegiatanPage=Math.min('+maxP+',kegiatanPage+1);renderKegiatanContent()">Berikutnya →</button>'
+  + '</div>';
+}
   var contentEl = document.getElementById('kegiatan-content');
   if (!contentEl) return;
 
